@@ -109,7 +109,7 @@ async function main() {
     data: allowedEmails.map((email) => ({ email })),
     skipDuplicates: true
   })
-
+/*
   const seedQuizId = "44166625-8fd9-4f3b-a44b-9c2e5392c4b3";
   const existingQuiz = await prisma.quiz.findUnique({
     where: { id: seedQuizId }
@@ -196,6 +196,7 @@ async function main() {
     });
   
   }
+    */
 }
 
 main()
