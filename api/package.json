@@ -1,0 +1,46 @@
+{
+  "name": "quizz-api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/src/main.js",
+    "build:watch": "tsc -w -p tsconfig.build.json --preserveWatchOutput",
+    "serve:watch": "node --watch --watch-preserve-output dist/src/main.js",
+    "start:dev": "sh -c 'npm run build || exit 1; npm run build:watch & watcher=$!; trap \"kill $watcher 2>/dev/null || true\" EXIT INT TERM; npm run serve:watch'",
+    "lint": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "start:dev:poll": "npm run start:dev",
+    "docker:dev": "docker compose --profile dev up"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/platform-socket.io": "^11.0.0",
+    "@nestjs/schedule": "^6.0.0",
+    "@nestjs/websockets": "^11.0.0",
+    "@prisma/client": "^6.0.0",
+    "bcrypt": "^5.1.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "ioredis": "^5.10.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/node": "^24.0.0",
+    "prisma": "^6.0.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  }
+}

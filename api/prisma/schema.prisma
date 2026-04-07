@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum QuizStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  FINISHED
+}
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  name             String?
+  createdAt        DateTime          @default(now())
+  participants     Participant[]
+  waitingPresences WaitingPresence[]
+}
+
+model Admin {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model AllowedEmail {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Quiz {
+  id               String            @id @default(uuid())
+  title            String
+  startTime        DateTime
+  durationSeconds  Int
+  status           QuizStatus        @default(DRAFT)
+  createdAt        DateTime          @default(now())
+  questions        Question[]
+  participants     Participant[]
+  waitingPresences WaitingPresence[]
+}
+
+model Question {
+  id           String        @id @default(uuid())
+  quizId       String
+  title        String
+  order        Int
+  createdAt    DateTime      @default(now())
+  quiz         Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  alternatives Alternative[]
+  answers      Answer[]
+
+  @@unique([quizId, order])
+}
+
+model Alternative {
+  id         String    @id @default(uuid())
+  questionId String
+  text       String
+  isCorrect  Boolean   @default(false)
+  order      Int
+  createdAt  DateTime  @default(now())
+  question   Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers    Answer[]
+
+  @@unique([questionId, order])
+}
+
+model Participant {
+  id               String    @id @default(uuid())
+  quizId           String
+  userId           String
+  startedAt        DateTime
+  finishedAt       DateTime?
+  totalTimeSeconds Int       @default(0)
+  score            Int       @default(0)
+  createdAt        DateTime  @default(now())
+  quiz             Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers          Answer[]
+
+  @@unique([quizId, userId])
+}
+
+model WaitingPresence {
+  id         String   @id @default(uuid())
+  quizId     String
+  userId     String
+  email      String
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  quiz       Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, userId])
+  @@index([quizId, lastSeenAt])
+  @@index([userId])
+}
+
+model Answer {
+  id             String      @id @default(uuid())
+  participantId  String
+  questionId     String
+  alternativeId  String
+  isCorrect      Boolean
+  answeredAt     DateTime    @default(now())
+  responseTimeMs Int         @default(0)
+  participant    Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  question       Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  alternative    Alternative @relation(fields: [alternativeId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, questionId])
+}

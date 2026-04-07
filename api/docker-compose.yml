@@ -1,0 +1,87 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: quizz-postgres
+    environment:
+      POSTGRES_DB: quiz
+      POSTGRES_USER: quiz
+      POSTGRES_PASSWORD: quiz
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_v15:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quiz -d quiz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: quizz-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quizz-api
+    profiles:
+      - prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      CORS_ORIGIN: http://localhost:3000,http://0.0.0.0:3000
+      JWT_SECRET: change-me
+      DATABASE_URL: postgresql://quiz:quiz@postgres:5432/quiz?schema=public
+      REDIS_URL: redis://redis:6379
+      ADMIN_SEED_USERNAME: admin
+      ADMIN_SEED_EMAIL: admin@guidance.dev
+      ADMIN_SEED_PASSWORD: Admin123!
+    ports:
+      - "4000:4000"
+
+  api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: quizz-api-dev
+    profiles:
+      - dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      CORS_ORIGIN: http://localhost:3000,http://0.0.0.0:3000
+      JWT_SECRET: change-me
+      DATABASE_URL: postgresql://quiz:quiz@postgres:5432/quiz?schema=public
+      REDIS_URL: redis://redis:6379
+      ADMIN_SEED_USERNAME: admin
+      ADMIN_SEED_EMAIL: admin@guidance.dev
+      ADMIN_SEED_PASSWORD: Admin123!
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./tsconfig.build.json:/app/tsconfig.build.json
+      - /app/node_modules
+
+volumes:
+  postgres_data_v15:
