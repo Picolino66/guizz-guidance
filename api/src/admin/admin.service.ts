@@ -7,6 +7,7 @@ import { CreateAllowedEmailDto } from "./dto/create-allowed-email.dto";
 import { CreateAlternativeDto } from "./dto/create-alternative.dto";
 import { CreateQuestionDto } from "./dto/create-question.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
+import { capitalizeName } from "../ranking/ranking.utils";
 
 const WAITING_PRESENCE_TTL_MS = 30_000;
 
@@ -235,7 +236,7 @@ export class AdminService {
       ranking,
       participants: participants.map((participant) => ({
         id: participant.id,
-        name: participant.user.name ?? participant.user.email,
+        name: participant.user.name ? capitalizeName(participant.user.name) : participant.user.email,
         email: participant.user.email,
         startedAt: participant.startedAt,
         finishedAt: participant.finishedAt,
@@ -248,7 +249,9 @@ export class AdminService {
         alternative: answer.alternative.text,
         isCorrect: answer.isCorrect,
         answeredAt: answer.answeredAt,
-        participantName: answer.participant.user.name ?? answer.participant.user.email
+        participantName: answer.participant.user.name
+          ? capitalizeName(answer.participant.user.name)
+          : answer.participant.user.email
       }))
     };
   }

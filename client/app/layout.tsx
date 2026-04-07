@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import DevToolsMessage from "../components/devtools-message";
 
 export const metadata: Metadata = {
   title: "Guidance Quiz Platform",
@@ -13,7 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        <DevToolsMessage />
+        {children}
+      </body>
     </html>
   );
 }

@@ -390,7 +390,7 @@ export function QuizPageClient() {
   const currentAnswerId = currentQuestion ? answersByQuestionId[currentQuestion.id] : null;
 
   return (
-    <div className="quiz-screen">
+    <div className={`quiz-screen${isLastQuestion ? " quiz-screen--last" : ""}`}>
       <div aria-hidden="true" className="quiz-screen__ribbon" />
       <div aria-hidden="true" className="quiz-screen__ribbon quiz-screen__ribbon--secondary" />
       <div aria-hidden="true" className="quiz-screen__glow quiz-screen__glow--left" />
@@ -446,13 +446,12 @@ export function QuizPageClient() {
           ) : currentQuestion ? (
             <>
               <section className="quiz-panel">
-                <div className="quiz-panel__question">
-                  <div className="quiz-panel__avatar">
-                    <span className="quiz-panel__avatar-core">
-                      <Icon className="h-7 w-7" name="question" />
-                    </span>
+                {isLastQuestion && (
+                  <div className="quiz-panel__gptw-wrapper">
+                    <img alt="Great Place to Work" className="quiz-panel__gptw-logo" src="/gptw.png" />
                   </div>
-
+                )}
+                <div className="quiz-panel__question">
                   <div className="quiz-panel__copy">
                     <h2>{currentQuestion.title}</h2>
                   </div>
@@ -477,9 +476,6 @@ export function QuizPageClient() {
                           <strong>{alternative.text}</strong>
                         </span>
 
-                        <span className="quiz-answer__cta">
-                          {isSelected ? "Selecionada" : "Selecionar"}
-                        </span>
                       </button>
                     );
                   })}
@@ -499,28 +495,26 @@ export function QuizPageClient() {
 
                   <span aria-hidden="true" className="quiz-controls__divider" />
 
-                  <button
-                    className="quiz-nav-button"
-                    disabled={currentIndex >= questions.length - 1 || finishing}
-                    onClick={() => setCurrentIndex((index) => Math.min(index + 1, questions.length - 1))}
-                    type="button"
-                  >
-                    Próximo →
-                  </button>
-                </div>
-
-                {isLastQuestion ? (
-                  <div className="quiz-submit-row">
+                  {isLastQuestion ? (
                     <button
                       className="quiz-submit-button"
                       disabled={finishing || savingQuestionId !== null}
                       onClick={handleFinishQuiz}
                       type="button"
                     >
-                      {finishing ? "Enviando..." : "Enviar Quiz"}
+                      {finishing ? "Enviando..." : "Enviar Respostas"}
                     </button>
-                  </div>
-                ) : null}
+                  ) : (
+                    <button
+                      className="quiz-nav-button"
+                      disabled={currentIndex >= questions.length - 1 || finishing}
+                      onClick={() => setCurrentIndex((index) => Math.min(index + 1, questions.length - 1))}
+                      type="button"
+                    >
+                      Próximo →
+                    </button>
+                  )}
+                </div>
               </section>
             </>
           ) : loadState === "empty" ? (

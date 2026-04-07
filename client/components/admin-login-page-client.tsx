@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Icon } from "./icons";
 import { apiFetch } from "../lib/api";
 import { getAdminToken, setAdminToken } from "../lib/session";
@@ -54,48 +55,14 @@ export function AdminLoginPageClient() {
     <div className="admin-login">
       <div className="admin-login__frame">
         <section className="admin-login__hero">
-          <div className="admin-login__accent" />
-
-          <div className="admin-login__badge">
-            <span className="admin-login__badge-mark">
-              <Icon className="h-5 w-5" name="shield" />
-            </span>
-            <span>Admin Guidance</span>
-          </div>
-
-          <div className="admin-login__copy">
-            <p className="admin-login__eyebrow">Controle administrativo</p>
-            <h1 className="admin-login__title">Acesso reservado ao painel do quiz.</h1>
-            <p className="admin-login__text">
-              Entre com suas credenciais administrativas para monitorar a rodada,
-              iniciar o quiz e acompanhar o resultado em tempo real.
-            </p>
-          </div>
-
-          <div className="admin-login__highlights">
-            <article className="admin-login__highlight">
-              <span className="admin-login__highlight-icon">
-                <Icon className="h-5 w-5" name="chart" />
-              </span>
-              <div>
-                <p className="admin-login__highlight-title">Dashboard instantâneo</p>
-                <p className="admin-login__highlight-text">
-                  Quiz, participantes e tempo centralizados na primeira dobra.
-                </p>
-              </div>
-            </article>
-
-            <article className="admin-login__highlight">
-              <span className="admin-login__highlight-icon">
-                <Icon className="h-5 w-5" name="bolt" />
-              </span>
-              <div>
-                <p className="admin-login__highlight-title">Ações rápidas</p>
-                <p className="admin-login__highlight-text">
-                  Operação preparada para iniciar a rodada e abrir o ranking sem ruído.
-                </p>
-              </div>
-            </article>
+          <div className="admin-login__mascote">
+            <Image
+              src="/mascote.png"
+              alt="Mascote"
+              width={320}
+              height={320}
+              priority
+            />
           </div>
         </section>
 

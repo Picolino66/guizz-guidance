@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Icon } from "../components/icons";
 import { apiFetch } from "../lib/api";
 import { clearActiveQuizId, setParticipantToken } from "../lib/session";
@@ -11,6 +12,20 @@ export default function HomePage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [easterEgg, setEasterEgg] = useState(false);
+  const [spinning, setSpinning] = useState(false);
+
+  useEffect(() => {
+    function handleKey(event: KeyboardEvent) {
+      if (event.shiftKey && event.key === "I") {
+        setEasterEgg((prev) => !prev);
+        setSpinning(true);
+        setTimeout(() => setSpinning(false), 550);
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,28 +57,27 @@ export default function HomePage() {
   }
 
   return (
-    <div className="login-home">
-      <div aria-hidden="true" className="login-home__ribbon" />
-      <div aria-hidden="true" className="login-home__ribbon login-home__ribbon--secondary" />
-      <div aria-hidden="true" className="login-home__glow login-home__glow--left" />
-      <div aria-hidden="true" className="login-home__glow login-home__glow--right" />
+    <div className={`login-home${easterEgg ? " login-home--easter-egg" : ""}`}>
+      {!easterEgg && <div aria-hidden="true" className="login-home__ribbon" />}
+      {!easterEgg && <div aria-hidden="true" className="login-home__ribbon login-home__ribbon--secondary" />}
+      {!easterEgg && <div aria-hidden="true" className="login-home__glow login-home__glow--left" />}
+      {!easterEgg && <div aria-hidden="true" className="login-home__glow login-home__glow--right" />}
 
       <main className="login-card">
         <header className="login-brand">
-          <div aria-hidden="true" className="login-brand-mark">
-            <span className="login-brand-core">
-              <Icon className="h-10 w-10" name="trophy" />
-            </span>
-            <span className="login-brand-spark login-brand-spark--left">
-              <Icon className="h-4 w-4" name="sparkles" />
-            </span>
-            <span className="login-brand-spark login-brand-spark--right">
-              <Icon className="h-5 w-5" name="mail" />
-            </span>
+          <div aria-hidden="true" className={`login-brand-mark${easterEgg ? " login-brand-mark--easter-egg" : ""}`}>
+            <Image
+              src={easterEgg ? "/egs.jpeg" : "/mascote.png"}
+              alt="Mascote"
+              width={100}
+              height={100}
+              className={`login-mascote${spinning ? " login-mascote--spin" : ""}`}
+              priority
+            />
           </div>
 
           <div className="login-copy">
-            <h1 className="login-title">Quiz Guidance Platform</h1>
+            <h1 className="login-title">Quiz Guidance</h1>
             <p className="login-subtitle">
               Informe seu e-mail corporativo para participar do quiz.
             </p>

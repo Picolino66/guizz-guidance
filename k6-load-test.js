@@ -1,17 +1,30 @@
 import http from "k6/http"
 import { check, sleep } from "k6"
+import { Trend } from "k6/metrics"
+import ws from "k6/ws"
 
 // ─── Configuração ────────────────────────────────────────────────────────────
 
-const QUIZ_ID = "01e919e8-c688-49c4-971c-4184eb516ce2"
-const API_BASE = "http://0.0.0.0:4000"
-const CLIENT_BASE = "http://0.0.0.0:3000"
+const QUIZ_ID     = "c004ffd4-54ec-4a49-a86f-2ad091a797f7"
+const API_BASE    = "https://api.quizz.azicode.com.br"
+const CLIENT_BASE = "https://quizz.azicode.com.br"
+const WS_URL_WSS  = "wss://api.quizz.azicode.com.br"
 
-// Intervalo de polling na sala de espera (segundos)
-const POLLING_INTERVAL_S = 5
+// Intervalo de polling na sala de espera (segundos) — igual ao frontend real
+const POLLING_INTERVAL_S = 4
 
 // Pausa entre respostas de perguntas (segundos) — simula tempo de leitura
 const ANSWER_DELAY_S = 2
+
+// ─── Métricas customizadas por etapa ─────────────────────────────────────────
+
+const trendLogin    = new Trend("duration_login", true)
+const trendPresence = new Trend("duration_waiting_presence", true)
+const trendStart    = new Trend("duration_start", true)
+const trendQuestions = new Trend("duration_questions", true)
+const trendAnswer   = new Trend("duration_answer", true)
+const trendFinish   = new Trend("duration_finish", true)
+const trendRanking  = new Trend("duration_ranking", true)
 
 // ─── Emails dos participantes ─────────────────────────────────────────────────
 
@@ -108,11 +121,21 @@ export const options = {
       vus: EMAILS.length,
       iterations: EMAILS.length,
       maxDuration: "30m",
+      exec: "default",
+    },
+    ranking_viewers: {
+      executor: "constant-vus",
+      vus: 5,
+      duration: "40s",
+      exec: "rankingViewer",
     },
   },
   thresholds: {
-    http_req_failed: ["rate<0.05"],
-    http_req_duration: ["p(95)<3000"],
+    http_req_failed:           ["rate<0.05"],
+    http_req_duration:         ["p(95)<3000"],
+    duration_login:            ["p(95)<500"],
+    duration_answer:           ["p(95)<1000"],
+    duration_ranking:          ["p(95)<1000"],
   },
 }
 
@@ -128,10 +151,9 @@ function randomItem(arr) {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
-// ─── Cenário principal ────────────────────────────────────────────────────────
+// ─── Cenário: participante ────────────────────────────────────────────────────
 
 export default function () {
-  // Cada VU pega seu email pelo índice (__VU começa em 1)
   const email = EMAILS[__VU - 1]
   if (!email) {
     console.error(`VU ${__VU}: sem email disponível, abortando.`)
@@ -150,6 +172,7 @@ export default function () {
     JSON.stringify({ email }),
     { headers: jsonHeaders() }
   )
+  trendLogin.add(loginRes.timings.duration)
 
   const loginOk = check(loginRes, {
     "login: status 201": (r) => r.status === 201,
@@ -168,22 +191,33 @@ export default function () {
 
   // ── 3. Sala de espera — polling até o quiz iniciar ───────────────────────────
   let quizRunning = false
+  const waitStart = Date.now()
+  const WAIT_TIMEOUT_MS = 25 * 60 * 1000 // 25 min máximo na sala de espera
 
   while (!quizRunning) {
-    // Heartbeat de presença
-    http.post(
+    if (Date.now() - waitStart > WAIT_TIMEOUT_MS) {
+      console.warn(`[${email}] Timeout na sala de espera. Encerrando.`)
+      return
+    }
+    const presenceRes = http.post(
       `${API_BASE}/participant/waiting-presence/${QUIZ_ID}`,
       null,
       { headers: jsonHeaders(token) }
     )
+    trendPresence.add(presenceRes.timings.duration)
 
-    // Verificar estado do quiz
     const stateRes = http.get(
       `${API_BASE}/participant/quiz-state/${QUIZ_ID}`,
       { headers: jsonHeaders(token) }
     )
 
     if (stateRes.status === 200) {
+      check(stateRes, {
+        "quiz-state: tem viewerState": (r) => {
+          try { return !!JSON.parse(r.body).viewerState } catch { return false }
+        },
+      })
+
       try {
         const state = JSON.parse(stateRes.body)
         if (state.quiz && state.quiz.status === "RUNNING") {
@@ -206,6 +240,7 @@ export default function () {
     JSON.stringify({ quizId: QUIZ_ID }),
     { headers: jsonHeaders(token) }
   )
+  trendStart.add(startRes.timings.duration)
 
   const startOk = check(startRes, {
     "start: status 201": (r) => r.status === 201,
@@ -221,6 +256,7 @@ export default function () {
     `${API_BASE}/quiz/${QUIZ_ID}/questions`,
     { headers: jsonHeaders(token) }
   )
+  trendQuestions.add(questionsRes.timings.duration)
 
   const questionsOk = check(questionsRes, {
     "questions: status 200": (r) => r.status === 200,
@@ -260,15 +296,16 @@ export default function () {
 
     const answerRes = http.post(
       `${API_BASE}/participant/answer`,
-      JSON.stringify({
-        questionId: question.id,
-        alternativeId: chosen.id,
-      }),
+      JSON.stringify({ questionId: question.id, alternativeId: chosen.id }),
       { headers: jsonHeaders(token) }
     )
+    trendAnswer.add(answerRes.timings.duration)
 
     check(answerRes, {
       "answer: status 201": (r) => r.status === 201,
+      "answer: tem isCorrect": (r) => {
+        try { return typeof JSON.parse(r.body).isCorrect === "boolean" } catch { return false }
+      },
     })
 
     if (answerRes.status !== 201) {
@@ -286,9 +323,16 @@ export default function () {
     JSON.stringify({ quizId: QUIZ_ID }),
     { headers: jsonHeaders(token) }
   )
+  trendFinish.add(finishRes.timings.duration)
 
   check(finishRes, {
     "finish: status 201": (r) => r.status === 201,
+    "finish: tem score": (r) => {
+      try {
+        const b = JSON.parse(r.body)
+        return typeof b.score === "number" && typeof b.totalTimeSeconds === "number"
+      } catch { return false }
+    },
   })
 
   if (finishRes.status === 201) {
@@ -303,4 +347,88 @@ export default function () {
   } else {
     console.error(`[${email}] Falha ao finalizar: ${finishRes.status} — ${finishRes.body}`)
   }
+
+  // ── 8. Consultar ranking final ───────────────────────────────────────────────
+  const rankingRes = http.get(
+    `${API_BASE}/quiz/${QUIZ_ID}/ranking`,
+    { headers: jsonHeaders(token) }
+  )
+  trendRanking.add(rankingRes.timings.duration)
+
+  check(rankingRes, {
+    "ranking: status 200": (r) => r.status === 200,
+    "ranking: é array": (r) => {
+      try { return Array.isArray(JSON.parse(r.body)) } catch { return false }
+    },
+    "ranking: tem position e score": (r) => {
+      try {
+        const arr = JSON.parse(r.body)
+        return arr.length === 0 || (
+          typeof arr[0].position === "number" &&
+          typeof arr[0].score === "number"
+        )
+      } catch { return false }
+    },
+  })
+}
+
+// ─── Cenário: observador de ranking via WebSocket ─────────────────────────────
+//
+// Simula o comportamento da página /ranking do frontend:
+// conecta ao Socket.io (namespace /quiz), mantém a conexão viva respondendo
+// pings e conta quantos eventos ranking_updated são recebidos.
+//
+// Protocolo Engine.IO v4 (texto):
+//   "0{...}"  → handshake open (servidor → cliente)
+//   "40"      → Socket.IO connect ao namespace raiz
+//   "40/quiz" → Socket.IO connect ao namespace /quiz
+//   "2"       → ping (servidor → cliente) → responder com "3" (pong)
+//   '42/quiz,["evento", payload]' → emit do servidor no namespace /quiz
+
+export function rankingViewer() {
+  const wsUrl = `${WS_URL_WSS}/socket.io/?EIO=4&transport=websocket`
+  let rankingUpdateCount = 0
+  let connected = false
+
+  ws.connect(wsUrl, {}, (socket) => {
+    socket.on("open", () => {
+      // Engine.IO abre a conexão; aguardar pacote "0" de handshake via onmessage
+    })
+
+    socket.on("message", (data) => {
+      // Handshake Engine.IO — conectar ao namespace /quiz
+      if (data.startsWith("0") && !connected) {
+        socket.send("40/quiz,")
+        connected = true
+        return
+      }
+
+      // Confirmação de conexão ao namespace /quiz
+      if (data === "40/quiz," || data.startsWith("40/quiz,{")) {
+        console.log(`[viewer ${__VU}] Conectado ao namespace /quiz`)
+        return
+      }
+
+      // Responder pings do servidor
+      if (data === "2") {
+        socket.send("3")
+        return
+      }
+
+      // Evento ranking_updated
+      if (data.includes('"ranking_updated"')) {
+        rankingUpdateCount++
+      }
+    })
+
+    socket.on("error", (e) => {
+      console.error(`[viewer ${__VU}] WS error: ${e.error}`)
+    })
+
+    // Mantém a conexão durante toda a execução do quiz + margem
+    socket.setTimeout(() => {
+      socket.close()
+      console.log(`[viewer ${__VU}] Encerrado. Recebeu ${rankingUpdateCount} eventos ranking_updated`)
+    }, 40000)
+  })
 }
