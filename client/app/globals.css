@@ -2099,11 +2099,22 @@ main {
 }
 
 .quiz-screen--last .quiz-answer.is-selected {
-  border-color: rgba(229, 57, 53, 0.74);
-  background: linear-gradient(135deg, #E53935 0%, #C62828 100%);
+  border-color: rgba(25, 118, 210, 0.74);
+  background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+  color: #ffffff;
   box-shadow:
-    0 22px 38px rgba(229, 57, 53, 0.3),
+    0 22px 38px rgba(25, 118, 210, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.quiz-screen--last .quiz-answer.is-selected .quiz-answer__letter {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.quiz-screen--last .quiz-answer.is-selected .quiz-answer__cta {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
 
 .quiz-screen--last .quiz-answer__letter {
