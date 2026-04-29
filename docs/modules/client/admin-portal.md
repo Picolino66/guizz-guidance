@@ -1,0 +1,58 @@
+# Portal admin
+
+## Descricao
+Area administrativa para operar quizzes, whitelist e dashboard da rodada.
+
+## Localizacao no codigo
+- `client/app/page.tsx`
+- `client/app/login/page.tsx`
+- `client/app/hub/page.tsx`
+- `client/app/admin-quiz/page.tsx`
+- `client/app/admin/page.tsx`
+- `client/components/admin-login-page-client.tsx`
+- `client/components/admin-dashboard-page-client.tsx`
+- `client/components/rh/hub-page-client.tsx`
+- `client/app/admin-guidance/page.tsx`
+- `client/lib/session.ts`
+- `client/lib/rh-session.ts`
+
+## Entrada
+- Login admin `/login`
+- Login RH/TECH `/login?role=rh`
+- Hub `/`
+- Hub legado `/hub`
+- Dashboard `/admin-quiz`
+- Legados `/admin`, `/admin-guidance`
+- 404 `/admin/login`
+
+## Saida
+- Token admin salvo em storage local
+- Lista e criacao de quizzes
+- Painel com participantes, ranking e respostas
+- Gestao de emails liberados
+
+## Dependencias
+- `NEXT_PUBLIC_API_BASE_URL`
+- Token do admin
+- API de admin em `/auth` e `/admin`
+
+## Regras de negocio
+- O login redireciona para `/` quando o token admin ja existe.
+- O login RH/TECH usa a mesma tela `/login` com `role=rh`.
+- O hub e a entrada administrativa e o cartao de quiz abre `/admin-quiz`.
+- O cartao RH abre `/rh/dashboard` ou `/rh/tech/dashboard` quando a sessao RH existe e cai em `/login?role=rh` quando nao existe.
+- O dashboard canônico e `/admin-quiz`; `/admin` e redirecionamento legado.
+- A dashboard seleciona automaticamente o quiz com maior prioridade operacional.
+- O formulario de criacao de quiz exige inicio, duracao e titulo.
+
+## Fluxo resumido
+1. O admin autentica em `/login`.
+2. Entra no hub em `/` ou `/hub` e escolhe o modulo de quiz ou RH.
+3. Abre o dashboard em `/admin-quiz` para acompanhar a rodada.
+4. Pode criar quiz, adicionar perguntas e gerenciar emails liberados.
+5. Pode forcar inicio, encerrar quiz e revisar respostas.
+
+## Possiveis erros
+- Credenciais invalidas
+- Token ausente ou expirado
+- Validacao de formularios de quiz, pergunta ou whitelist

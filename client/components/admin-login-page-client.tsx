@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Icon } from "./icons";
 import { apiFetch } from "../lib/api";
-import { getAdminToken, setAdminToken } from "../lib/session";
+import { getAdminToken, setAdminToken, setSystemUser, SystemUser } from "../lib/session";
+import { getRhDashboardPath } from "../lib/rh-session";
 
 export function AdminLoginPageClient() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export function AdminLoginPageClient() {
 
   useEffect(() => {
     if (getAdminToken()) {
-      router.replace("/admin");
+      router.replace("/");
     }
   }, [router]);
 
@@ -32,7 +33,7 @@ export function AdminLoginPageClient() {
     setError(null);
 
     try {
-      const response = await apiFetch<{ accessToken: string }>("/auth/login-admin", {
+      const response = await apiFetch<{ accessToken: string; user: SystemUser }>("/auth/login-admin", {
         method: "POST",
         body: JSON.stringify({
           login: normalizedLogin,
@@ -41,10 +42,16 @@ export function AdminLoginPageClient() {
       });
 
       setAdminToken(response.accessToken);
-      router.replace("/admin");
+      setSystemUser(response.user);
+
+      if (response.user.role === "ADMIN") {
+        router.replace("/");
+      } else {
+        router.replace(getRhDashboardPath(response.user));
+      }
     } catch (submissionError) {
       setError(
-        submissionError instanceof Error ? submissionError.message : "Falha ao autenticar admin."
+        submissionError instanceof Error ? submissionError.message : "Falha ao autenticar."
       );
     } finally {
       setLoading(false);
@@ -68,10 +75,10 @@ export function AdminLoginPageClient() {
 
         <main className="admin-login__card">
           <div className="admin-login__card-header">
-            <p className="admin-login__card-kicker">Login admin</p>
+            <p className="admin-login__card-kicker">Login</p>
             <h2 className="admin-login__card-title">Entrar</h2>
             <p className="admin-login__card-text">
-              Use seu login e sua senha para acessar o dashboard administrativo.
+              Use seu e-mail e senha para acessar o sistema.
             </p>
           </div>
 
@@ -89,7 +96,7 @@ export function AdminLoginPageClient() {
                     setError(null);
                   }
                 }}
-                placeholder="Digite seu login"
+                placeholder="Digite seu e-mail"
                 required
                 value={login}
               />

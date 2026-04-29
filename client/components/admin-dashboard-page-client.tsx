@@ -8,7 +8,7 @@ import { clearAdminToken, getAdminToken } from "../lib/session";
 import { formatElapsedTime } from "../lib/time";
 
 type AdminView = "dashboard" | "quizzes" | "results" | "participants" | "settings";
-type QuizzesMode = "list" | "create" | "questions";
+type QuizzesMode = "list" | "create" | "email-select" | "questions";
 
 interface AdminAlternativeSummary {
   id: string;
@@ -438,6 +438,7 @@ export function AdminDashboardPageClient() {
   const [isReady, setIsReady] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(true);
   const [startingQuizId, setStartingQuizId] = useState<string | null>(null);
+  const [finishingQuizId, setFinishingQuizId] = useState<string | null>(null);
   const [selectedQuizId, setSelectedQuizId] = useState("");
   const [quizzes, setQuizzes] = useState<AdminQuizSummary[]>([]);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
@@ -460,6 +461,10 @@ export function AdminDashboardPageClient() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isSubmittingQuestions, setIsSubmittingQuestions] = useState(false);
   const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null);
+  const [quizEmailsRight, setQuizEmailsRight] = useState<AllowedEmailEntry[]>([]);
+  const [leftChecked, setLeftChecked] = useState<Set<string>>(new Set());
+  const [rightChecked, setRightChecked] = useState<Set<string>>(new Set());
+  const [isLinkingEmails, setIsLinkingEmails] = useState(false);
   const tokenRef = useRef<string | null>(null);
   const isAdminDataRequestInFlightRef = useRef(false);
   const hasQueuedAdminRefreshRef = useRef(false);
@@ -496,7 +501,7 @@ export function AdminDashboardPageClient() {
 
     if (!storedToken) {
       setIsReady(true);
-      router.replace("/admin/login");
+      router.replace("/login");
       return;
     }
 
@@ -598,7 +603,7 @@ export function AdminDashboardPageClient() {
         clearAdminToken();
         tokenRef.current = null;
         setToken(null);
-        router.replace("/admin/login");
+        router.replace("/login");
         return;
       }
 
@@ -639,7 +644,7 @@ export function AdminDashboardPageClient() {
         clearAdminToken();
         tokenRef.current = null;
         setToken(null);
-        router.replace("/admin/login");
+        router.replace("/login");
         return;
       }
 
@@ -657,12 +662,95 @@ export function AdminDashboardPageClient() {
     setCreatedQuizId(null);
     setIsCreatingQuiz(false);
     setIsSubmittingQuestions(false);
+    setQuizEmailsRight([]);
+    setLeftChecked(new Set());
+    setRightChecked(new Set());
+    setIsLinkingEmails(false);
   }
 
   function resetPasswordForm() {
     setPasswordForm(DEFAULT_PASSWORD_FORM);
     setPasswordVisibility(DEFAULT_PASSWORD_VISIBILITY);
     setIsChangingPassword(false);
+  }
+
+  function handleToggleLeftCheck(id: string) {
+    setLeftChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function handleToggleRightCheck(id: string) {
+    setRightChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function handleMoveToRight() {
+    const toMove = allowedEmails.filter((e) => leftChecked.has(e.id));
+    setQuizEmailsRight((prev) => {
+      const existingIds = new Set(prev.map((e) => e.id));
+      return [...prev, ...toMove.filter((e) => !existingIds.has(e.id))];
+    });
+    setLeftChecked(new Set());
+  }
+
+  function handleMoveToLeft() {
+    setQuizEmailsRight((prev) => prev.filter((e) => !rightChecked.has(e.id)));
+    setRightChecked(new Set());
+  }
+
+  async function handleLinkEmails() {
+    if (!token || !createdQuizId) {
+      return;
+    }
+
+    setIsLinkingEmails(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiFetch(
+        `/admin/quizzes/${createdQuizId}/allowed-emails`,
+        {
+          method: "POST",
+          body: JSON.stringify({ emailIds: quizEmailsRight.map((e) => e.id) })
+        },
+        token
+      );
+
+      setQuizzesMode("questions");
+      setMessage("Participantes vinculados. Agora adicione as perguntas.");
+      await loadAdminData(token, createdQuizId);
+    } catch (submissionError) {
+      if (isUnauthorizedError(submissionError)) {
+        clearAdminToken();
+        tokenRef.current = null;
+        setToken(null);
+        router.replace("/login");
+        return;
+      }
+
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Falha ao vincular participantes."
+      );
+    } finally {
+      setIsLinkingEmails(false);
+    }
   }
 
   function openDashboard() {
@@ -758,7 +846,7 @@ export function AdminDashboardPageClient() {
         clearAdminToken();
         tokenRef.current = null;
         setToken(null);
-        router.replace("/admin/login");
+        router.replace("/login");
         return;
       }
 
@@ -770,11 +858,49 @@ export function AdminDashboardPageClient() {
     }
   }
 
+  async function handleFinishQuiz(quizId: string) {
+    if (!token) {
+      return;
+    }
+
+    setFinishingQuizId(quizId);
+    setSelectedQuizId(quizId);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiFetch(
+        `/admin/quizzes/${quizId}/finish`,
+        {
+          method: "POST"
+        },
+        token
+      );
+
+      setMessage("Quiz encerrado com sucesso.");
+      openResults(quizId);
+    } catch (submissionError) {
+      if (isUnauthorizedError(submissionError)) {
+        clearAdminToken();
+        tokenRef.current = null;
+        setToken(null);
+        router.replace("/login");
+        return;
+      }
+
+      setError(
+        submissionError instanceof Error ? submissionError.message : "Falha ao encerrar o quiz."
+      );
+    } finally {
+      setFinishingQuizId(null);
+    }
+  }
+
   function handleLogout() {
     clearAdminToken();
     tokenRef.current = null;
     setToken(null);
-    router.replace("/admin/login");
+    router.replace("/login");
   }
 
   function handleExportResults() {
@@ -871,7 +997,7 @@ export function AdminDashboardPageClient() {
         clearAdminToken();
         tokenRef.current = null;
         setToken(null);
-        router.replace("/admin/login");
+        router.replace("/login");
         return;
       }
 
@@ -910,7 +1036,7 @@ export function AdminDashboardPageClient() {
         clearAdminToken();
         tokenRef.current = null;
         setToken(null);
-        router.replace("/admin/login");
+        router.replace("/login");
         return;
       }
 
@@ -959,13 +1085,13 @@ export function AdminDashboardPageClient() {
       clearAdminToken();
       tokenRef.current = null;
       setToken(null);
-      router.replace("/admin/login");
+      router.replace("/login");
     } catch (submissionError) {
       if (isUnauthorizedError(submissionError)) {
         clearAdminToken();
         tokenRef.current = null;
         setToken(null);
-        router.replace("/admin/login");
+        router.replace("/login");
         return;
       }
 
@@ -1014,15 +1140,19 @@ export function AdminDashboardPageClient() {
 
       setCreatedQuizId(createdQuiz.id);
       setSelectedQuizId(createdQuiz.id);
-      setQuizzesMode("questions");
-      setMessage("Quiz criado. Agora adicione as perguntas.");
-      await loadAdminData(token, createdQuiz.id);
+      setQuizEmailsRight([]);
+      setLeftChecked(new Set());
+      setRightChecked(new Set());
+      const emailsResponse = await fetchAllowedEmails(token);
+      setAllowedEmails(emailsResponse);
+      setQuizzesMode("email-select");
+      setMessage("Quiz criado. Vincule os participantes.");
     } catch (submissionError) {
       if (isUnauthorizedError(submissionError)) {
         clearAdminToken();
         tokenRef.current = null;
         setToken(null);
-        router.replace("/admin/login");
+        router.replace("/login");
         return;
       }
 
@@ -1210,7 +1340,7 @@ export function AdminDashboardPageClient() {
         clearAdminToken();
         tokenRef.current = null;
         setToken(null);
-        router.replace("/admin/login");
+        router.replace("/login");
         return;
       }
 
@@ -1228,6 +1358,8 @@ export function AdminDashboardPageClient() {
     Boolean(selectedQuiz) &&
     selectedQuiz?.status !== "RUNNING" &&
     selectedQuiz?.status !== "FINISHED";
+
+  const canFinishSelectedQuiz = selectedQuiz?.status === "RUNNING";
 
   const canViewResults = Boolean(selectedQuizId);
   const canExportResults = Boolean(dashboard?.ranking.length);
@@ -1248,7 +1380,9 @@ export function AdminDashboardPageClient() {
           ? "Operação"
           : quizzesMode === "create"
             ? "Novo quiz"
-            : "Estrutura";
+            : quizzesMode === "email-select"
+              ? "Novo quiz"
+              : "Estrutura";
   const pageTitle =
     activeView === "dashboard"
       ? "Dashboard"
@@ -1262,7 +1396,9 @@ export function AdminDashboardPageClient() {
           ? "Quizzes"
           : quizzesMode === "create"
             ? "Criar Quiz"
-            : "Adicionar Perguntas";
+            : quizzesMode === "email-select"
+              ? "Vincular Participantes"
+              : "Adicionar Perguntas";
   const pageSubtitle =
     activeView === "dashboard"
       ? "Aqui o admin bate o olho e entende tudo."
@@ -1276,7 +1412,9 @@ export function AdminDashboardPageClient() {
           ? "Veja o quiz em andamento e acompanhe as rodadas mais recentes."
           : quizzesMode === "create"
             ? "Cadastre os dados básicos da próxima rodada."
-            : "Monte as perguntas e marque a alternativa correta de cada uma.";
+            : quizzesMode === "email-select"
+              ? "Selecione quem pode participar desta rodada."
+              : "Monte as perguntas e marque a alternativa correta de cada uma.";
 
   if (!isReady || !token) {
     return <div className="admin-app admin-app--loading" />;
@@ -1445,6 +1583,19 @@ export function AdminDashboardPageClient() {
                       type="button"
                     >
                       {startingQuizId === selectedQuizId ? "Iniciando..." : "Iniciar Quiz"}
+                    </button>
+
+                    <button
+                      className="admin-button admin-button--danger"
+                      disabled={!canFinishSelectedQuiz || finishingQuizId === selectedQuizId}
+                      onClick={() => {
+                        if (selectedQuizId) {
+                          void handleFinishQuiz(selectedQuizId);
+                        }
+                      }}
+                      type="button"
+                    >
+                      {finishingQuizId === selectedQuizId ? "Encerrando..." : "Encerrar Quiz"}
                     </button>
 
                     <button
@@ -1792,6 +1943,7 @@ export function AdminDashboardPageClient() {
                         quiz.status !== "RUNNING" &&
                         quiz.status !== "FINISHED" &&
                         startingQuizId !== quiz.id;
+                      const canFinishQuiz = isRunning && finishingQuizId !== quiz.id;
 
                       return (
                         <article
@@ -1830,6 +1982,19 @@ export function AdminDashboardPageClient() {
                               </button>
                             ) : null}
 
+                            {isRunning ? (
+                              <button
+                                className="admin-button admin-button--danger"
+                                disabled={!canFinishQuiz}
+                                onClick={() => {
+                                  void handleFinishQuiz(quiz.id);
+                                }}
+                                type="button"
+                              >
+                                {finishingQuizId === quiz.id ? "Encerrando..." : "Forçar Encerramento"}
+                              </button>
+                            ) : null}
+
                             <button
                               className="admin-button admin-button--dark"
                               onClick={() => {
@@ -1858,6 +2023,110 @@ export function AdminDashboardPageClient() {
                   </div>
                 )}
               </section>
+            ) : quizzesMode === "email-select" ? (
+              <section className="admin-dashboard-card">
+                <div className="admin-form-progress">
+                  <div className="admin-form-step is-complete">
+                    <span className="admin-form-step__number">1</span>
+                    <span>Criar Quiz</span>
+                  </div>
+                  <div className="admin-form-step is-active">
+                    <span className="admin-form-step__number">2</span>
+                    <span>Participantes</span>
+                  </div>
+                  <div className="admin-form-step">
+                    <span className="admin-form-step__number">3</span>
+                    <span>Perguntas</span>
+                  </div>
+                </div>
+
+                <div className="admin-email-transfer">
+                  <div className="admin-email-transfer__panel">
+                    <p className="admin-email-transfer__panel-title">
+                      Emails do sistema ({allowedEmails.filter((e) => !quizEmailsRight.some((r) => r.id === e.id)).length})
+                    </p>
+                    <div className="admin-email-transfer__list">
+                      {allowedEmails
+                        .filter((e) => !quizEmailsRight.some((r) => r.id === e.id))
+                        .map((entry) => (
+                          <label className="admin-email-transfer__item" key={entry.id}>
+                            <input
+                              checked={leftChecked.has(entry.id)}
+                              className="admin-email-transfer__checkbox"
+                              onChange={() => { handleToggleLeftCheck(entry.id); }}
+                              type="checkbox"
+                            />
+                            <span className="admin-email-transfer__email">{entry.email}</span>
+                          </label>
+                        ))}
+                      {allowedEmails.filter((e) => !quizEmailsRight.some((r) => r.id === e.id)).length === 0 ? (
+                        <p className="admin-email-transfer__empty">Todos os emails já foram adicionados.</p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="admin-email-transfer__controls">
+                    <button
+                      className="admin-button admin-button--secondary admin-button--inline"
+                      disabled={leftChecked.size === 0}
+                      onClick={handleMoveToRight}
+                      title="Mover selecionados para participantes"
+                      type="button"
+                    >
+                      →
+                    </button>
+                    <button
+                      className="admin-button admin-button--secondary admin-button--inline"
+                      disabled={rightChecked.size === 0}
+                      onClick={handleMoveToLeft}
+                      title="Remover selecionados dos participantes"
+                      type="button"
+                    >
+                      ←
+                    </button>
+                  </div>
+
+                  <div className="admin-email-transfer__panel">
+                    <p className="admin-email-transfer__panel-title">
+                      Participantes do quiz ({quizEmailsRight.length})
+                    </p>
+                    <div className="admin-email-transfer__list">
+                      {quizEmailsRight.map((entry) => (
+                        <label className="admin-email-transfer__item" key={entry.id}>
+                          <input
+                            checked={rightChecked.has(entry.id)}
+                            className="admin-email-transfer__checkbox"
+                            onChange={() => { handleToggleRightCheck(entry.id); }}
+                            type="checkbox"
+                          />
+                          <span className="admin-email-transfer__email">{entry.email}</span>
+                        </label>
+                      ))}
+                      {quizEmailsRight.length === 0 ? (
+                        <p className="admin-email-transfer__empty">Nenhum participante selecionado.</p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-actions">
+                  <button
+                    className="admin-button admin-button--secondary"
+                    onClick={openQuizList}
+                    type="button"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    className="admin-button admin-button--primary"
+                    disabled={isLinkingEmails || quizEmailsRight.length === 0}
+                    onClick={() => { void handleLinkEmails(); }}
+                    type="button"
+                  >
+                    {isLinkingEmails ? "Salvando..." : "Continuar"}
+                  </button>
+                </div>
+              </section>
             ) : quizzesMode === "create" ? (
               <section className="admin-dashboard-card">
                 <div className="admin-form-progress">
@@ -1867,7 +2136,11 @@ export function AdminDashboardPageClient() {
                   </div>
                   <div className="admin-form-step">
                     <span className="admin-form-step__number">2</span>
-                    <span>Adicionar Perguntas</span>
+                    <span>Participantes</span>
+                  </div>
+                  <div className="admin-form-step">
+                    <span className="admin-form-step__number">3</span>
+                    <span>Perguntas</span>
                   </div>
                 </div>
 
@@ -1937,9 +2210,13 @@ export function AdminDashboardPageClient() {
                     <span className="admin-form-step__number">1</span>
                     <span>Criar Quiz</span>
                   </div>
-                  <div className="admin-form-step is-active">
+                  <div className="admin-form-step is-complete">
                     <span className="admin-form-step__number">2</span>
-                    <span>Adicionar Perguntas</span>
+                    <span>Participantes</span>
+                  </div>
+                  <div className="admin-form-step is-active">
+                    <span className="admin-form-step__number">3</span>
+                    <span>Perguntas</span>
                   </div>
                 </div>
 

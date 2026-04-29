@@ -1,4 +1,4 @@
-import { PrismaClient, QuizStatus } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
@@ -9,15 +9,13 @@ async function main() {
   const password = process.env.ADMIN_SEED_PASSWORD ?? "Admin123!";
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const existingAdmin = await prisma.admin.findFirst({
-    where: {
-      OR: [{ username }, { email }]
-    }
+  const existingAdmin = await prisma.systemUser.findFirst({
+    where: { OR: [{ username }, { email }] }
   });
 
   if (!existingAdmin) {
-    await prisma.admin.create({
-      data: { username, email, passwordHash }
+    await prisma.systemUser.create({
+      data: { username, email, passwordHash, role: "ADMIN" }
     });
   }
 
@@ -199,8 +197,24 @@ async function main() {
     */
 }
 
+async function seedRh() {
+  const userPassword = await bcrypt.hash("User123!", 10);
+
+  await prisma.systemUser.upsert({
+    where: { email: "rh@guidance.dev" },
+    update: { role: "USER" },
+    create: { name: "RH Guidance", email: "rh@guidance.dev", role: "USER", passwordHash: userPassword }
+  });
+  await prisma.systemUser.upsert({
+    where: { email: "tech1@guidance.dev" },
+    update: { role: "USER" },
+    create: { name: "Entrevistador 1", email: "tech1@guidance.dev", role: "USER", passwordHash: userPassword }
+  });
+}
+
 main()
   .then(async () => {
+    await seedRh();
     await prisma.$disconnect();
   })
   .catch(async (error) => {

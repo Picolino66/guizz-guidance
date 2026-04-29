@@ -23,30 +23,25 @@ model User {
   waitingPresences WaitingPresence[]
 }
 
-model Admin {
-  id           String   @id @default(uuid())
-  username     String   @unique
-  email        String   @unique
-  passwordHash String
-  createdAt    DateTime @default(now())
-}
 
 model AllowedEmail {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  createdAt DateTime @default(now())
+  id                String             @id @default(uuid())
+  email             String             @unique
+  createdAt         DateTime           @default(now())
+  quizAllowedEmails QuizAllowedEmail[]
 }
 
 model Quiz {
-  id               String            @id @default(uuid())
-  title            String
-  startTime        DateTime
-  durationSeconds  Int
-  status           QuizStatus        @default(DRAFT)
-  createdAt        DateTime          @default(now())
-  questions        Question[]
-  participants     Participant[]
-  waitingPresences WaitingPresence[]
+  id                String             @id @default(uuid())
+  title             String
+  startTime         DateTime
+  durationSeconds   Int
+  status            QuizStatus         @default(DRAFT)
+  createdAt         DateTime           @default(now())
+  questions         Question[]
+  participants      Participant[]
+  waitingPresences  WaitingPresence[]
+  quizAllowedEmails QuizAllowedEmail[]
 }
 
 model Question {
@@ -106,6 +101,17 @@ model WaitingPresence {
   @@index([userId])
 }
 
+model QuizAllowedEmail {
+  id             String       @id @default(uuid())
+  quizId         String
+  allowedEmailId String
+  createdAt      DateTime     @default(now())
+  quiz           Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  allowedEmail   AllowedEmail @relation(fields: [allowedEmailId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, allowedEmailId])
+}
+
 model Answer {
   id             String      @id @default(uuid())
   participantId  String
@@ -119,4 +125,185 @@ model Answer {
   alternative    Alternative @relation(fields: [alternativeId], references: [id], onDelete: Cascade)
 
   @@unique([participantId, questionId])
+}
+
+// ─── Sistema de Usuários Unificado ───────────────────────────────────────────
+
+enum SystemRole {
+  ADMIN
+  USER
+}
+
+enum InterviewStatus {
+  DRAFT
+  SCHEDULING
+  WAITING_TECH_CONFIRMATION
+  WAITING_RH_APPROVAL
+  SCHEDULED
+  DONE
+  EVALUATED
+  CLOSED
+}
+
+enum SlotStatus {
+  PROPOSED
+  CONFIRMED
+  REJECTED
+}
+
+enum FormQuestionType {
+  YES_NO
+  TEXT
+  TEXTAREA
+  SINGLE_CHOICE
+  NUMBER
+}
+
+enum InterviewDecision {
+  APPROVED
+  REJECTED
+  HOLD
+}
+
+model SystemUser {
+  id                   String              @id @default(cuid())
+  name                 String?
+  username             String?             @unique
+  email                String              @unique
+  role                 SystemRole
+  passwordHash         String
+  createdAt            DateTime            @default(now())
+  interviewLinks       InterviewAssignee[]
+  createdSlots         InterviewSlot[]     @relation("RhSlotCreator")
+  createdTemplates     FormTemplate[]
+  submissions          FormSubmission[]
+  auditLogs            AuditLog[]
+}
+
+model Candidate {
+  id                   String      @id @default(cuid())
+  name                 String
+  linkedinUrl          String?
+  pretensaoSenioridade String?
+  cidadeEstado         String
+  formacao             String
+  resumoProfissional   String
+  ferramentas          String
+  motivacaoMudanca     String
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  interviews           Interview[]
+}
+
+model JobPosition {
+  id         String      @id @default(cuid())
+  titulo     String
+  nivel      String
+  descricao  String?
+  stackTags  String[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  interviews Interview[]
+}
+
+model Interview {
+  id              String              @id @default(cuid())
+  candidateId     String
+  jobPositionId   String
+  status          InterviewStatus     @default(DRAFT)
+  templateId      String?
+  confirmedSlotId String?             @unique
+  finalDecision   InterviewDecision?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  candidate       Candidate           @relation(fields: [candidateId], references: [id])
+  jobPosition     JobPosition         @relation(fields: [jobPositionId], references: [id])
+  assignees       InterviewAssignee[]
+  slots           InterviewSlot[]
+  confirmedSlot   InterviewSlot?      @relation("ConfirmedSlot", fields: [confirmedSlotId], references: [id])
+  formTemplate    FormTemplate?       @relation(fields: [templateId], references: [id])
+  submission      FormSubmission?
+  auditLogs       AuditLog[]
+}
+
+model InterviewAssignee {
+  interviewId String
+  userId      String
+  assignedAt  DateTime  @default(now())
+  interview   Interview @relation(fields: [interviewId], references: [id])
+  user        SystemUser @relation(fields: [userId], references: [id])
+
+  @@id([interviewId, userId])
+}
+
+model InterviewSlot {
+  id          String     @id @default(cuid())
+  interviewId String
+  startAt     DateTime
+  endAt       DateTime?
+  status      SlotStatus @default(PROPOSED)
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  interview   Interview  @relation(fields: [interviewId], references: [id])
+  createdBy   SystemUser @relation("RhSlotCreator", fields: [createdById], references: [id])
+  confirmedIn Interview? @relation("ConfirmedSlot")
+}
+
+model FormTemplate {
+  id          String         @id @default(cuid())
+  name        String
+  version     Int            @default(1)
+  isLocked    Boolean        @default(false)
+  createdById String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  questions   FormQuestion[]
+  interviews  Interview[]
+  createdBy   SystemUser     @relation(fields: [createdById], references: [id])
+}
+
+model FormQuestion {
+  id         String           @id @default(cuid())
+  templateId String
+  order      Int
+  label      String
+  type       FormQuestionType
+  required   Boolean          @default(false)
+  options    String[]
+  template   FormTemplate     @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  answers    FormAnswer[]
+}
+
+model FormSubmission {
+  id          String       @id @default(cuid())
+  interviewId String       @unique
+  createdById String
+  createdAt   DateTime     @default(now())
+  interview   Interview    @relation(fields: [interviewId], references: [id])
+  createdBy   SystemUser   @relation(fields: [createdById], references: [id])
+  answers     FormAnswer[]
+}
+
+model FormAnswer {
+  id           String         @id @default(cuid())
+  submissionId String
+  questionId   String
+  valueText    String?
+  valueNumber  Float?
+  valueBoolean Boolean?
+  valueChoice  String?
+  submission   FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  question     FormQuestion   @relation(fields: [questionId], references: [id])
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  interviewId String?
+  actorId     String?
+  action      String
+  details     Json?
+  createdAt   DateTime   @default(now())
+  interview   Interview? @relation(fields: [interviewId], references: [id])
+  actor       SystemUser? @relation(fields: [actorId], references: [id])
 }

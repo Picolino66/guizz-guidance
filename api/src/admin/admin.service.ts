@@ -7,6 +7,7 @@ import { CreateAllowedEmailDto } from "./dto/create-allowed-email.dto";
 import { CreateAlternativeDto } from "./dto/create-alternative.dto";
 import { CreateQuestionDto } from "./dto/create-question.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
+import { SetQuizAllowedEmailsDto } from "./dto/set-quiz-allowed-emails.dto";
 import { capitalizeName } from "../ranking/ranking.utils";
 
 const WAITING_PRESENCE_TTL_MS = 30_000;
@@ -130,6 +131,33 @@ export class AdminService {
     });
   }
 
+  async setQuizAllowedEmails(quizId: string, dto: SetQuizAllowedEmailsDto) {
+    const quiz = await this.prisma.quiz.findUnique({ where: { id: quizId } });
+    if (!quiz) {
+      throw new NotFoundException("Quiz não encontrado.");
+    }
+
+    if (dto.emailIds.length > 0) {
+      const found = await this.prisma.allowedEmail.findMany({
+        where: { id: { in: dto.emailIds } },
+        select: { id: true }
+      });
+      if (found.length !== dto.emailIds.length) {
+        throw new BadRequestException("Um ou mais e-mails não foram encontrados.");
+      }
+    }
+
+    await this.prisma.quizAllowedEmail.deleteMany({ where: { quizId } });
+
+    if (dto.emailIds.length > 0) {
+      await this.prisma.quizAllowedEmail.createMany({
+        data: dto.emailIds.map((allowedEmailId) => ({ quizId, allowedEmailId }))
+      });
+    }
+
+    return { quizId, linked: dto.emailIds.length };
+  }
+
   async removeAllowedEmail(allowedEmailId: string) {
     const allowedEmail = await this.prisma.allowedEmail.findUnique({
       where: {
@@ -212,7 +240,7 @@ export class AdminService {
             userId: true
           }
         }),
-        this.prisma.allowedEmail.count()
+        this.prisma.quizAllowedEmail.count({ where: { quizId } })
       ]);
 
     const confirmedParticipants = new Set([

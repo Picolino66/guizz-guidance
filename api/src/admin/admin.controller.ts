@@ -12,6 +12,7 @@ import { CreateAllowedEmailDto } from "./dto/create-allowed-email.dto";
 import { CreateAlternativeDto } from "./dto/create-alternative.dto";
 import { CreateQuestionDto } from "./dto/create-question.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
+import { SetQuizAllowedEmailsDto } from "./dto/set-quiz-allowed-emails.dto";
 import { AdminService } from "./admin.service";
 
 @UseGuards(AdminAuthGuard)
@@ -42,6 +43,14 @@ export class AdminController {
   @Post("quizzes/:quizId/questions")
   addQuestion(@Param("quizId") quizId: string, @Body() dto: CreateQuestionDto) {
     return this.adminService.addQuestion(quizId, dto);
+  }
+
+  @Post("quizzes/:quizId/allowed-emails")
+  setQuizAllowedEmails(
+    @Param("quizId") quizId: string,
+    @Body() dto: SetQuizAllowedEmailsDto
+  ) {
+    return this.adminService.setQuizAllowedEmails(quizId, dto);
   }
 
   @Post("questions/:questionId/alternatives")

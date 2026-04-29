@@ -98,13 +98,13 @@ export function WaitingPageClient() {
 
   const invalidateParticipantSession = () => {
     clearParticipantSession();
-    router.replace("/");
+    router.replace("/quiz-login");
   };
 
   useEffect(() => {
     const token = getParticipantToken();
     if (!token) {
-      router.replace("/");
+      router.replace("/quiz-login");
       return;
     }
 

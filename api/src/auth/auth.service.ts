@@ -52,7 +52,7 @@ export class AuthService {
 
   async loginAdmin(dto: LoginAdminDto) {
     const login = dto.login.trim().toLowerCase();
-    const admin = await this.prisma.admin.findFirst({
+    const systemUser = await this.prisma.systemUser.findFirst({
       where: {
         OR: [
           { username: login },
@@ -61,44 +61,43 @@ export class AuthService {
       }
     });
 
-    if (!admin) {
+    if (!systemUser) {
       throw new UnauthorizedException("Credenciais inválidas.");
     }
 
-    const validPassword = await bcrypt.compare(dto.password, admin.passwordHash);
+    const validPassword = await bcrypt.compare(dto.password, systemUser.passwordHash);
     if (!validPassword) {
       throw new UnauthorizedException("Credenciais inválidas.");
     }
 
     const accessToken = await this.jwtService.signAsync({
-      sub: admin.id,
-      email: admin.email,
-      username: admin.username,
-      role: "admin"
+      sub: systemUser.id,
+      email: systemUser.email,
+      role: systemUser.role
     });
 
     return {
       accessToken,
-      admin: {
-        id: admin.id,
-        username: admin.username,
-        email: admin.email
+      user: {
+        id: systemUser.id,
+        name: systemUser.name,
+        username: systemUser.username,
+        email: systemUser.email,
+        role: systemUser.role
       }
     };
   }
 
   async changeAdminPassword(user: AuthUser, dto: ChangeAdminPasswordDto) {
-    const admin = await this.prisma.admin.findUnique({
-      where: {
-        id: user.sub
-      }
+    const systemUser = await this.prisma.systemUser.findUnique({
+      where: { id: user.sub }
     });
 
-    if (!admin) {
-      throw new NotFoundException("Administrador não encontrado.");
+    if (!systemUser) {
+      throw new NotFoundException("Usuário não encontrado.");
     }
 
-    const validPassword = await bcrypt.compare(dto.currentPassword, admin.passwordHash);
+    const validPassword = await bcrypt.compare(dto.currentPassword, systemUser.passwordHash);
     if (!validPassword) {
       throw new BadRequestException("Senha atual incorreta.");
     }
@@ -109,13 +108,9 @@ export class AuthService {
 
     const nextPasswordHash = await bcrypt.hash(dto.newPassword, 10);
 
-    await this.prisma.admin.update({
-      where: {
-        id: admin.id
-      },
-      data: {
-        passwordHash: nextPasswordHash
-      }
+    await this.prisma.systemUser.update({
+      where: { id: systemUser.id },
+      data: { passwordHash: nextPasswordHash }
     });
 
     return {

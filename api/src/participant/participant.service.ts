@@ -28,6 +28,17 @@ export class ParticipantService {
   async start(user: AuthUser, dto: StartParticipantDto) {
     const quiz = await this.quizService.ensureQuizIsRunning(dto.quizId);
 
+    const emailLink = await this.prisma.quizAllowedEmail.findFirst({
+      where: {
+        quizId: dto.quizId,
+        allowedEmail: { email: user.email }
+      }
+    });
+
+    if (!emailLink) {
+      throw new ForbiddenException("Você não está na lista de participantes deste quiz.");
+    }
+
     const existingParticipant = await this.prisma.participant.findUnique({
       where: {
         quizId_userId: {
@@ -237,7 +248,7 @@ export class ParticipantService {
             }
           }
         }),
-        this.prisma.allowedEmail.count(),
+        this.prisma.quizAllowedEmail.count({ where: { quizId } }),
         this.prisma.waitingPresence.count({
           where: {
             quizId

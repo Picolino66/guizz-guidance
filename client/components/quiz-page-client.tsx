@@ -87,14 +87,19 @@ export function QuizPageClient() {
 
   const invalidateParticipantSession = () => {
     clearParticipantSession();
-    router.replace("/");
+    router.replace("/quiz-login");
   };
 
   useEffect(() => {
     const token = getParticipantToken();
     const quizId = searchParams.get("quizId") ?? getActiveQuizId();
 
-    if (!token || !quizId) {
+    if (!token) {
+      router.replace("/quiz-login");
+      return;
+    }
+
+    if (!quizId) {
       router.replace("/waiting");
       return;
     }

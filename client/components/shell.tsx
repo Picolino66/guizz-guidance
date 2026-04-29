@@ -16,11 +16,11 @@ export function Shell({
 }) {
   const pathname = usePathname();
   const navigationItems = [
-    { href: "/", label: "Entrar", icon: "home", tone: "coral" },
+    { href: "/quiz-login", label: "Entrar", icon: "home", tone: "coral" },
     { href: "/waiting", label: "Espera", icon: "clock", tone: "sky" },
     { href: "/quiz", label: "Quiz", icon: "play", tone: "mint" },
     { href: "/ranking", label: "Ranking", icon: "trophy", tone: "amber" },
-    { href: "/admin-guidance", label: "Admin", icon: "chart", tone: "lilac" }
+    { href: "/", label: "Hub", icon: "chart", tone: "lilac" }
   ] as const;
 
   return (
@@ -73,8 +73,13 @@ export function Shell({
                 {navigationItems.map((item) => {
                   const isActive =
                     pathname === item.href ||
-                    (item.href === "/admin-guidance" &&
-                      (pathname === "/admin-guidance" || pathname === "/admin"));
+                    (item.href === "/" &&
+                      (pathname === "/hub" ||
+                        pathname === "/" ||
+                        pathname === "/login" ||
+                        pathname === "/admin-quiz" ||
+                        pathname === "/admin" ||
+                        pathname === "/admin-guidance"));
 
                   return (
                     <Link

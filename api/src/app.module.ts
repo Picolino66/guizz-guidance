@@ -10,6 +10,7 @@ import { RankingModule } from "./ranking/ranking.module";
 import { AdminModule } from "./admin/admin.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 import { AppController } from "./app.controller";
+import { RhModule } from "./rh/rh.module";
 
 @Module({
   controllers: [AppController],
@@ -25,7 +26,8 @@ import { AppController } from "./app.controller";
     QuizModule,
     ParticipantModule,
     RankingModule,
-    AdminModule
+    AdminModule,
+    RhModule
   ]
 })
 export class AppModule {}

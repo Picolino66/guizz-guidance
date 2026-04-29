@@ -1,5 +1,5 @@
-import { AdminDashboardPageClient } from "../../components/admin-dashboard-page-client";
+import { redirect } from "next/navigation"
 
 export default function AdminPage() {
-  return <AdminDashboardPageClient />;
+  redirect("/admin-quiz")
 }
