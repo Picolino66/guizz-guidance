@@ -307,3 +307,106 @@ model AuditLog {
   interview   Interview? @relation(fields: [interviewId], references: [id])
   actor       SystemUser? @relation(fields: [actorId], references: [id])
 }
+
+// ─── WhatsApp Automation ────────────────────────────────────────────────────
+
+enum WhatsappSessionStatus {
+  DISCONNECTED
+  CONNECTING
+  QR_REQUIRED
+  READY
+  ERROR
+}
+
+enum WhatsappAutomationKind {
+  ONE_SHOT
+  REMINDER
+  DAILY
+  WEEKLY
+  MONTHLY
+  BIRTHDAY
+}
+
+enum WhatsappAutomationStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum WhatsappDispatchStatus {
+  PENDING
+  RETRYING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model WhatsappConnection {
+  id                  String                @id @default(cuid())
+  key                 String                @unique @default("primary")
+  label               String
+  phoneNumber         String?
+  groupName           String?
+  groupJid            String?
+  status              WhatsappSessionStatus @default(DISCONNECTED)
+  qrCode              String?
+  session             Json?
+  lastConnectedAt     DateTime?
+  lastDisconnectedAt  DateTime?
+  lastSeenAt          DateTime?
+  lastError           String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  automations         WhatsappAutomation[]
+  dispatchLogs        WhatsappDispatchLog[]
+}
+
+model WhatsappAutomation {
+  id                   String                  @id @default(cuid())
+  connectionId         String
+  title                String
+  message              String
+  kind                 WhatsappAutomationKind
+  status               WhatsappAutomationStatus @default(ACTIVE)
+  targetGroupJid       String?
+  scheduledFor         DateTime?
+  timeOfDay            String?
+  daysOfWeek           Int[]                   @default([])
+  dayOfMonth           Int?
+  monthDay             String?
+  recurrenceTimeZone   String                  @default("America/Sao_Paulo")
+  lastRunAt            DateTime?
+  nextRunAt            DateTime?
+  lastStatus           WhatsappDispatchStatus?
+  lastError            String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  connection           WhatsappConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  dispatchLogs         WhatsappDispatchLog[]
+
+  @@index([status, nextRunAt])
+  @@index([connectionId, status])
+}
+
+model WhatsappDispatchLog {
+  id                 String                @id @default(cuid())
+  automationId       String?
+  connectionId       String
+  dispatchKey        String                @unique
+  targetGroupJid     String
+  message            String
+  status             WhatsappDispatchStatus
+  attempts           Int                   @default(0)
+  errorMessage       String?
+  sentAt             DateTime?
+  scheduledFor       DateTime?
+  triggeredBy        String
+  metadata           Json?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  automation         WhatsappAutomation?   @relation(fields: [automationId], references: [id], onDelete: SetNull)
+  connection         WhatsappConnection    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, createdAt])
+  @@index([automationId, createdAt])
+}

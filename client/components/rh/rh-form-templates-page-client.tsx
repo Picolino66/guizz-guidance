@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { rhFetch, FormTemplate, FormQuestion, FormQuestionType } from "../../lib/rh-api"
+import { redirectIfUnauthorized } from "../../lib/api"
 import { RhLayout } from "./rh-layout"
 
 const QUESTION_TYPES: { value: FormQuestionType; label: string }[] = [
@@ -140,13 +142,14 @@ function TemplateEditorModal({ template, onClose, onSave }: {
 }
 
 export function RhFormTemplatesPageClient() {
+  const router = useRouter()
   const [templates, setTemplates] = useState<FormTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<FormTemplate | null | "new">(null)
 
   async function load() {
     setLoading(true)
-    try { setTemplates(await rhFetch<FormTemplate[]>("/rh/form-templates")) } catch {}
+    try { setTemplates(await rhFetch<FormTemplate[]>("/rh/form-templates")) } catch (err) { redirectIfUnauthorized(err, () => router.replace("/login")) }
     setLoading(false)
   }
 

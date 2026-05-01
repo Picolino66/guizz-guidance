@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { rhFetch, Interview, FormQuestion, STATUS_LABELS, STATUS_COLORS } from "../../lib/rh-api"
+import { redirectIfUnauthorized } from "../../lib/api"
 import { RhLayout } from "./rh-layout"
 
 interface Props { id: string }
@@ -80,6 +82,7 @@ function DynamicForm({ questions, onSubmit }: { questions: FormQuestion[]; onSub
 }
 
 export function RhTechInterviewDetailPageClient({ id }: Props) {
+  const router = useRouter()
   const [interview, setInterview] = useState<Interview | null>(null)
   const [loading, setLoading] = useState(true)
   const [counterSlots, setCounterSlots] = useState<string[]>([""])
@@ -88,7 +91,7 @@ export function RhTechInterviewDetailPageClient({ id }: Props) {
 
   async function load() {
     setLoading(true)
-    try { setInterview(await rhFetch<Interview>(`/rh/interviews/${id}`)) } catch {}
+    try { setInterview(await rhFetch<Interview>(`/rh/interviews/${id}`)) } catch (err) { redirectIfUnauthorized(err, () => router.replace("/login")) }
     setLoading(false)
   }
 

@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { rhFetch, Candidate } from "../../lib/rh-api"
+import { redirectIfUnauthorized } from "../../lib/api"
 import { RhLayout } from "./rh-layout"
 
 function CandidateModal({ candidate, onClose, onSave }: { candidate?: Candidate | null; onClose: () => void; onSave: () => void }) {
@@ -68,6 +70,7 @@ function CandidateModal({ candidate, onClose, onSave }: { candidate?: Candidate 
 }
 
 export function RhCandidatesPageClient() {
+  const router = useRouter()
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<Candidate | null | "new">(null)
@@ -75,7 +78,7 @@ export function RhCandidatesPageClient() {
 
   async function load() {
     setLoading(true)
-    try { setCandidates(await rhFetch<Candidate[]>("/rh/candidates")) } catch {}
+    try { setCandidates(await rhFetch<Candidate[]>("/rh/candidates")) } catch (err) { redirectIfUnauthorized(err, () => router.replace("/login")) }
     setLoading(false)
   }
 

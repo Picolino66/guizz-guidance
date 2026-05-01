@@ -1,8 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { rhFetch, Interview, STATUS_LABELS, STATUS_COLORS, DECISION_LABELS, DECISION_COLORS, RhUserSummary } from "../../lib/rh-api"
 import { getRhUser } from "../../lib/rh-session"
+import { redirectIfUnauthorized } from "../../lib/api"
 import { RhLayout } from "./rh-layout"
 
 interface Props { id: string }
@@ -27,6 +29,7 @@ function formatAction(action: string) {
 }
 
 export function RhInterviewDetailPageClient({ id }: Props) {
+  const router = useRouter()
   const [interview, setInterview] = useState<Interview | null>(null)
   const [users, setUsers] = useState<RhUserSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,7 +46,9 @@ export function RhInterviewDetailPageClient({ id }: Props) {
       ])
       setInterview(iv)
       setUsers(us)
-    } catch {}
+    } catch (err) {
+      if (redirectIfUnauthorized(err, () => router.replace("/login"))) return
+    }
     setLoading(false)
   }
 

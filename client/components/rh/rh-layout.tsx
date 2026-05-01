@@ -23,10 +23,12 @@ const NAV_LINKS = [
 export function RhLayout({ children }: Props) {
   const router = useRouter()
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState<RhUser | null>(null)
 
   useEffect(() => {
     if (!getRhToken()) { router.replace(RH_LOGIN_PATH); return }
+    setMounted(true)
     setUser(getRhUser())
   }, [router])
 
@@ -34,6 +36,8 @@ export function RhLayout({ children }: Props) {
     clearRhSession()
     router.push(RH_LOGIN_PATH)
   }
+
+  if (!mounted) return null
 
   return (
     <div className="rh-root">

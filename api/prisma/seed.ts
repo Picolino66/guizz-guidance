@@ -212,9 +212,23 @@ async function seedRh() {
   });
 }
 
+async function seedWhatsapp() {
+  await prisma.whatsappConnection.upsert({
+    where: { key: "primary" },
+    update: {
+      label: "Canal WhatsApp Guidance"
+    },
+    create: {
+      key: "primary",
+      label: "Canal WhatsApp Guidance"
+    }
+  })
+}
+
 main()
   .then(async () => {
     await seedRh();
+    await seedWhatsapp();
     await prisma.$disconnect();
   })
   .catch(async (error) => {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { rhFetch, Interview, InterviewStatus, STATUS_LABELS, STATUS_COLORS } from "../../lib/rh-api"
 import { getRhToken, RH_LOGIN_PATH } from "../../lib/rh-session"
+import { redirectIfUnauthorized } from "../../lib/api"
 import { RhLayout } from "./rh-layout"
 
 export function RhDashboardPageClient() {
@@ -24,7 +25,9 @@ export function RhDashboardPageClient() {
       const params = filterStatus ? `?status=${filterStatus}` : ""
       const data = await rhFetch<Interview[]>(`/rh/interviews${params}`)
       setInterviews(data)
-    } catch {}
+    } catch (err) {
+      if (redirectIfUnauthorized(err, () => router.replace("/login"))) return
+    }
     setLoading(false)
   }
 

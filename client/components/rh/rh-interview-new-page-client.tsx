@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { rhFetch, Candidate, JobPosition, FormTemplate } from "../../lib/rh-api"
+import { redirectIfUnauthorized } from "../../lib/api"
 import { RhLayout } from "./rh-layout"
 
 export function RhInterviewNewPageClient() {
@@ -19,7 +20,7 @@ export function RhInterviewNewPageClient() {
       rhFetch<Candidate[]>("/rh/candidates"),
       rhFetch<JobPosition[]>("/rh/jobs"),
       rhFetch<FormTemplate[]>("/rh/form-templates"),
-    ]).then(([c, j, t]) => { setCandidates(c); setJobs(j); setTemplates(t) }).catch(() => {})
+    ]).then(([c, j, t]) => { setCandidates(c); setJobs(j); setTemplates(t) }).catch((err: unknown) => { redirectIfUnauthorized(err, () => router.replace("/login")) })
   }, [])
 
   async function handleSubmit() {

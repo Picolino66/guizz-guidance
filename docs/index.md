@@ -1,10 +1,10 @@
 # Quizz
 
 ## Visao geral
-Aplicacao de quiz em monorepo com duas partes principais:
+Aplicacao de quiz em monorepo com tres superficies principais:
 
 - `api/`: backend NestJS com Prisma, PostgreSQL, Redis e WebSocket
-- `client/`: frontend Next.js App Router com telas publicas, painel admin e portal RH
+- `client/`: frontend Next.js App Router com telas publicas, painel admin, portal RH e portal WhatsApp
 
 ## Como navegar
 1. Leia primeiro os indices dos modulos.
@@ -21,4 +21,3 @@ Aplicacao de quiz em monorepo com duas partes principais:
 - Rotas e telas do frontend em `client/app`
 - Componentes e fluxos de tela em `client/components`
 - Funcoes de fetch, session e utilitarios em `client/lib`
-

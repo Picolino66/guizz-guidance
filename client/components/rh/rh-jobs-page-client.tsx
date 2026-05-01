@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { rhFetch, JobPosition } from "../../lib/rh-api"
+import { redirectIfUnauthorized } from "../../lib/api"
 import { RhLayout } from "./rh-layout"
 
 function JobModal({ job, onClose, onSave }: { job?: JobPosition | null; onClose: () => void; onSave: () => void }) {
@@ -63,13 +65,14 @@ function JobModal({ job, onClose, onSave }: { job?: JobPosition | null; onClose:
 }
 
 export function RhJobsPageClient() {
+  const router = useRouter()
   const [jobs, setJobs] = useState<JobPosition[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<JobPosition | null | "new">(null)
 
   async function load() {
     setLoading(true)
-    try { setJobs(await rhFetch<JobPosition[]>("/rh/jobs")) } catch {}
+    try { setJobs(await rhFetch<JobPosition[]>("/rh/jobs")) } catch (err) { redirectIfUnauthorized(err, () => router.replace("/login")) }
     setLoading(false)
   }
 

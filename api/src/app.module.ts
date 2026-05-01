@@ -11,6 +11,7 @@ import { AdminModule } from "./admin/admin.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 import { AppController } from "./app.controller";
 import { RhModule } from "./rh/rh.module";
+import { WhatsappModule } from "./whatsapp/whatsapp.module";
 
 @Module({
   controllers: [AppController],
@@ -27,7 +28,8 @@ import { RhModule } from "./rh/rh.module";
     ParticipantModule,
     RankingModule,
     AdminModule,
-    RhModule
+    RhModule,
+    WhatsappModule
   ]
 })
 export class AppModule {}

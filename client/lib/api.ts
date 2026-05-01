@@ -75,6 +75,14 @@ export function isUnauthorizedError(error: unknown) {
   return error instanceof ApiError && error.status === 401;
 }
 
+export function redirectIfUnauthorized(err: unknown, onUnauthorized: () => void): boolean {
+  if (isUnauthorizedError(err)) {
+    onUnauthorized()
+    return true
+  }
+  return false
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},

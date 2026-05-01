@@ -17,6 +17,7 @@ Módulos principais em `api/src`:
 - `quiz`
 - `ranking`
 - `realtime`
+- `whatsapp`
 
 Código compartilhado em `api/src/common` e persistência em `api/prisma`.
 
@@ -26,6 +27,7 @@ Código compartilhado em `api/src/common` e persistência em `api/prisma`.
 - Componentes reutilizáveis em `client/components`
 - Utilitários em `client/lib`
 - Estilos globais em `client/app/globals.css`
+- O hub administrativo abre `Quiz Admin`, `RH Recrutamento` e `WhatsApp`
 
 ## Pré-requisitos
 
@@ -105,7 +107,11 @@ npm run dev
 ```bash
 cd api
 docker compose --profile dev up
+ou
+docker compose --profile dev up --build
 ```
+
+A automacao WhatsApp usa Baileys e persiste a sessao no banco via Prisma, sem depender de Chromium/Puppeteer.
 
 ### Client
 

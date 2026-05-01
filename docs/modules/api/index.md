@@ -1,7 +1,7 @@
 # API
 
 ## Descricao
-Backend NestJS responsavel por autenticacao, operacao do quiz, ranking em tempo real e o dominio de RH/recrutamento.
+Backend NestJS responsavel por autenticacao, operacao do quiz, ranking em tempo real, dominio de RH/recrutamento e automacao de WhatsApp.
 
 ## Estrutura
 - `auth`: login de participante, login admin e troca de senha
@@ -18,6 +18,7 @@ Backend NestJS responsavel por autenticacao, operacao do quiz, ranking em tempo 
 - `Jwt` e guards para autenticacao
 - `@nestjs/schedule` para sincronizacao automatica de status
 - `socket.io` para eventos em tempo real
+- `@nestjs/schedule` para sincronizacao automatica de status e disparos
 
 ## Mapa de features
 - [Autenticacao](./auth.md)
@@ -33,4 +34,4 @@ Backend NestJS responsavel por autenticacao, operacao do quiz, ranking em tempo 
 - [RH interviews](./rh-interviews.md)
 - [RH form templates](./rh-form-templates.md)
 - [RH form submissions](./rh-form-submissions.md)
-
+- [WhatsApp automation](./whatsapp.md)

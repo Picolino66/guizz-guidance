@@ -1,7 +1,7 @@
 # Portal admin
 
 ## Descricao
-Area administrativa para operar quizzes, whitelist e dashboard da rodada.
+Area administrativa para operar quizzes, whitelist, dashboard da rodada e a entrada para o portal WhatsApp.
 
 ## Localizacao no codigo
 - `client/app/page.tsx`
@@ -12,6 +12,7 @@ Area administrativa para operar quizzes, whitelist e dashboard da rodada.
 - `client/components/admin-login-page-client.tsx`
 - `client/components/admin-dashboard-page-client.tsx`
 - `client/components/rh/hub-page-client.tsx`
+- `client/components/whatsapp/whatsapp-layout.tsx`
 - `client/app/admin-guidance/page.tsx`
 - `client/lib/session.ts`
 - `client/lib/rh-session.ts`
@@ -22,6 +23,7 @@ Area administrativa para operar quizzes, whitelist e dashboard da rodada.
 - Hub `/`
 - Hub legado `/hub`
 - Dashboard `/admin-quiz`
+- Portal WhatsApp `/whatsapp`
 - Legados `/admin`, `/admin-guidance`
 - 404 `/admin/login`
 
@@ -40,6 +42,7 @@ Area administrativa para operar quizzes, whitelist e dashboard da rodada.
 - O login redireciona para `/` quando o token admin ja existe.
 - O login RH/TECH usa a mesma tela `/login` com `role=rh`.
 - O hub e a entrada administrativa e o cartao de quiz abre `/admin-quiz`.
+- O hub e a entrada administrativa e o cartao WhatsApp abre `/whatsapp`.
 - O cartao RH abre `/rh/dashboard` ou `/rh/tech/dashboard` quando a sessao RH existe e cai em `/login?role=rh` quando nao existe.
 - O dashboard canônico e `/admin-quiz`; `/admin` e redirecionamento legado.
 - A dashboard seleciona automaticamente o quiz com maior prioridade operacional.
@@ -47,10 +50,11 @@ Area administrativa para operar quizzes, whitelist e dashboard da rodada.
 
 ## Fluxo resumido
 1. O admin autentica em `/login`.
-2. Entra no hub em `/` ou `/hub` e escolhe o modulo de quiz ou RH.
-3. Abre o dashboard em `/admin-quiz` para acompanhar a rodada.
-4. Pode criar quiz, adicionar perguntas e gerenciar emails liberados.
-5. Pode forcar inicio, encerrar quiz e revisar respostas.
+2. Entra no hub em `/` ou `/hub` e escolhe o modulo de quiz, RH ou WhatsApp.
+3. Pode abrir o portal WhatsApp em `/whatsapp` para gerenciar automacoes, logs e conexao.
+4. Abre o dashboard em `/admin-quiz` para acompanhar a rodada.
+5. Pode criar quiz, adicionar perguntas e gerenciar emails liberados.
+6. Pode forcar inicio, encerrar quiz e revisar respostas.
 
 ## Possiveis erros
 - Credenciais invalidas

@@ -1,7 +1,7 @@
 # Client
 
 ## Descricao
-Frontend Next.js App Router responsavel pelas telas publicas do quiz, portal admin e portal RH.
+Frontend Next.js App Router responsavel pelas telas publicas do quiz, portal admin, portal RH e portal WhatsApp.
 
 ## Estrutura
 - Rotas em `client/app`
@@ -19,4 +19,4 @@ Frontend Next.js App Router responsavel pelas telas publicas do quiz, portal adm
 - [Fluxo publico do quiz](./public-quiz.md)
 - [Portal admin](./admin-portal.md)
 - [Portal RH](./rh-portal.md)
-
+- [Portal WhatsApp](./whatsapp-portal.md)

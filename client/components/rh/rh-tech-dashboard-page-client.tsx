@@ -1,18 +1,21 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { rhFetch, Interview, STATUS_LABELS, STATUS_COLORS } from "../../lib/rh-api"
+import { redirectIfUnauthorized } from "../../lib/api"
 import { RhLayout } from "./rh-layout"
 
 export function RhTechDashboardPageClient() {
+  const router = useRouter()
   const [interviews, setInterviews] = useState<Interview[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     rhFetch<Interview[]>("/rh/interviews")
       .then(setInterviews)
-      .catch(() => {})
+      .catch((err: unknown) => { redirectIfUnauthorized(err, () => router.replace("/login")) })
       .finally(() => setLoading(false))
   }, [])
 
