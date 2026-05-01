@@ -11,6 +11,7 @@ Area administrativa para operar quizzes, whitelist, dashboard da rodada e a entr
 - `client/app/admin/page.tsx`
 - `client/components/admin-login-page-client.tsx`
 - `client/components/admin-dashboard-page-client.tsx`
+- `client/components/layout/app-shell.tsx`
 - `client/components/rh/hub-page-client.tsx`
 - `client/components/whatsapp/whatsapp-layout.tsx`
 - `client/app/admin-guidance/page.tsx`
@@ -41,18 +42,19 @@ Area administrativa para operar quizzes, whitelist, dashboard da rodada e a entr
 ## Regras de negocio
 - O login redireciona para `/` quando o token admin ja existe.
 - O login RH/TECH usa a mesma tela `/login` com `role=rh`.
-- O hub e a entrada administrativa e o cartao de quiz abre `/admin-quiz`.
-- O hub e a entrada administrativa e o cartao WhatsApp abre `/whatsapp`.
-- O cartao RH abre `/rh/dashboard` ou `/rh/tech/dashboard` quando a sessao RH existe e cai em `/login?role=rh` quando nao existe.
+- O hub e a entrada administrativa renderiza o shell compartilhado com conteudo central vazio.
+- O acesso aos modulos ocorre pelo sidebar compartilhado.
 - O dashboard canônico e `/admin-quiz`; `/admin` e redirecionamento legado.
+- O grupo `Quizz` do sidebar controla as views internas do dashboard administrativo.
 - A dashboard seleciona automaticamente o quiz com maior prioridade operacional.
 - O formulario de criacao de quiz exige inicio, duracao e titulo.
 
 ## Fluxo resumido
 1. O admin autentica em `/login`.
-2. Entra no hub em `/` ou `/hub` e escolhe o modulo de quiz, RH ou WhatsApp.
-3. Pode abrir o portal WhatsApp em `/whatsapp` para gerenciar automacoes, logs e conexao.
-4. Abre o dashboard em `/admin-quiz` para acompanhar a rodada.
+2. Entra no shell em `/` ou `/hub`.
+3. Usa o sidebar para abrir Quiz, RH ou WhatsApp.
+4. Pode abrir o portal WhatsApp em `/whatsapp` para gerenciar automacoes, logs e conexao.
+5. Abre o dashboard em `/admin-quiz` para acompanhar a rodada.
 5. Pode criar quiz, adicionar perguntas e gerenciar emails liberados.
 6. Pode forcar inicio, encerrar quiz e revisar respostas.
 

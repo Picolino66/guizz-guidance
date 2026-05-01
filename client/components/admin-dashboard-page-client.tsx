@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./icons";
+import { AppShell, type AppShellQuizNavigationItem } from "./layout/app-shell";
 import { QuizStatus, apiFetch, isUnauthorizedError } from "../lib/api";
 import { clearAdminToken, getAdminToken } from "../lib/session";
 import { formatElapsedTime } from "../lib/time";
@@ -120,8 +121,6 @@ const sidebarNavigationItems = [
   { label: "Participantes", mobileLabel: "Partic.", icon: "users", view: "participants" },
   { label: "Configurações", mobileLabel: "Config", icon: "shield", view: "settings" }
 ] as const;
-
-const mobileNavigationItems = sidebarNavigationItems;
 
 const DEFAULT_QUIZ_FORM: QuizFormState = {
   title: "",
@@ -896,13 +895,6 @@ export function AdminDashboardPageClient() {
     }
   }
 
-  function handleLogout() {
-    clearAdminToken();
-    tokenRef.current = null;
-    setToken(null);
-    router.replace("/login");
-  }
-
   function handleExportResults() {
     if (!selectedQuiz || !dashboard?.ranking.length) {
       return;
@@ -1415,68 +1407,26 @@ export function AdminDashboardPageClient() {
             : quizzesMode === "email-select"
               ? "Selecione quem pode participar desta rodada."
               : "Monte as perguntas e marque a alternativa correta de cada uma.";
+  const shellActiveView = activeView === "results" ? "dashboard" : activeView;
+  const quizNavigationItems: AppShellQuizNavigationItem[] = sidebarNavigationItems.map((item) => ({
+    ...item,
+    onSelect: handleNavigationSelection
+  }));
 
   if (!isReady || !token) {
     return <div className="admin-app admin-app--loading" />;
   }
 
   return (
-    <div className="admin-app">
-      <div className="admin-shell">
-        <aside className="admin-sidebar">
-          <div className="admin-sidebar__brand">
-            <span className="admin-brand__mark">
-              <Icon className="h-5 w-5" name="shield" />
-            </span>
-            <div>
-              <p className="admin-brand__eyebrow">Quiz Admin</p>
-              <p className="admin-brand__name">Guidance</p>
-            </div>
-          </div>
-
-          <nav aria-label="Admin navigation" className="admin-sidebar__nav">
-            {sidebarNavigationItems.map((item) => {
-              const isActive = item.view === activeView;
-              return (
-                <button
-                  aria-pressed={isActive}
-                  className={`admin-sidebar__item${isActive ? " is-active" : ""}`}
-                  key={item.view}
-                  onClick={() => {
-                    handleNavigationSelection(item.view);
-                  }}
-                  type="button"
-                >
-                  <span className="admin-sidebar__icon">
-                    <Icon className="h-4 w-4" name={item.icon} />
-                  </span>
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="admin-sidebar__footer">
-            <button className="admin-logout admin-logout--sidebar" onClick={handleLogout} type="button">
-              <Icon className="h-4 w-4" name="logout" />
-              <span>Sair</span>
-            </button>
-          </div>
-        </aside>
-
-        <div className="admin-content-shell">
-          <header className="admin-topbar">
-            <div className="admin-topbar__spacer" />
-
-            <div className="admin-topbar__actions">
-              <div className="admin-user">
-                <span className="admin-user__name">Admin</span>
-                <span className="admin-user__avatar">A</span>
-              </div>
-            </div>
-          </header>
-
-          <main className="admin-main">
+    <AppShell
+      quizNavigation={{
+        activeView: shellActiveView,
+        items: quizNavigationItems
+      }}
+      section="quiz"
+    >
+      <div className="admin-app">
+        <main className="admin-main">
             <div className="admin-main__header">
               <div>
                 <p className="admin-main__eyebrow">{pageEyebrow}</p>
@@ -2349,43 +2299,8 @@ export function AdminDashboardPageClient() {
                 </div>
               </section>
             )}
-          </main>
-        </div>
+        </main>
       </div>
-
-      <nav aria-label="Admin mobile navigation" className="admin-mobile-nav">
-        {mobileNavigationItems.map((item) => {
-          const isActive = item.view === activeView;
-
-          return (
-            <button
-              aria-pressed={isActive}
-              className={`admin-mobile-nav__item${isActive ? " is-active" : ""}`}
-              key={item.view}
-              onClick={() => {
-                handleNavigationSelection(item.view);
-              }}
-              type="button"
-            >
-              <span className="admin-mobile-nav__icon">
-                <Icon className="h-5 w-5" name={item.icon} />
-              </span>
-              <span className="admin-mobile-nav__label">{item.mobileLabel}</span>
-            </button>
-          );
-        })}
-
-        <button
-          className="admin-mobile-nav__item admin-mobile-nav__item--logout"
-          onClick={handleLogout}
-          type="button"
-        >
-          <span className="admin-mobile-nav__icon">
-            <Icon className="h-5 w-5" name="logout" />
-          </span>
-          <span className="admin-mobile-nav__label">Sair</span>
-        </button>
-      </nav>
-    </div>
+    </AppShell>
   );
 }

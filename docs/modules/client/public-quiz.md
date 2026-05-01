@@ -29,8 +29,9 @@ Fluxo do participante desde o login ate o ranking final.
 - Ranking final atualizado em tempo real
 
 ## Observacoes
-- A home `/` agora renderiza o mesmo hub administrativo de `/hub`, sem redirect.
+- A home `/` agora renderiza o shell administrativo compartilhado de `/hub`, sem redirect e com conteudo central vazio.
 - O fluxo do participante nao entra mais pelo hub.
+- O login do participante, espera, quiz e ranking permanecem fora do sidebar compartilhado.
 
 ## Dependencias
 - `NEXT_PUBLIC_API_BASE_URL`

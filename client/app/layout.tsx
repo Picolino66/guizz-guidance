@@ -1,6 +1,20 @@
 import type { Metadata } from "next";
+import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 import DevToolsMessage from "../components/devtools-message";
+
+const manrope = Manrope({
+  display: "swap",
+  subsets: ["latin"],
+  variable: "--font-primary"
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  display: "swap",
+  subsets: ["latin"],
+  variable: "--font-secondary",
+  weight: ["400", "500"]
+});
 
 export const metadata: Metadata = {
   title: "Guidance Quiz Platform",
@@ -14,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body>
+      <body className={`${manrope.variable} ${ibmPlexMono.variable}`}>
         <DevToolsMessage />
         {children}
       </body>

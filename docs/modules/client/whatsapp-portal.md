@@ -10,6 +10,7 @@ Area administrativa para operar a conexao WhatsApp, automacoes, logs e status da
 - `client/app/whatsapp/logs/page.tsx`
 - `client/app/whatsapp/connection/page.tsx`
 - `client/components/whatsapp/*.tsx`
+- `client/components/layout/app-shell.tsx`
 - `client/lib/whatsapp-api.ts`
 
 ## Entrada
@@ -28,11 +29,12 @@ Area administrativa para operar a conexao WhatsApp, automacoes, logs e status da
 - Token admin salvo em storage local
 - API de WhatsApp em `/whatsapp/*`
 - Socket.IO no namespace `/whatsapp` para status e QR em tempo real
-- Layout com navegacao lateral e logout administrativo
+- `WhatsappLayout` renderiza o `AppShell` compartilhado com navegacao lateral e logout administrativo
 - `qrcode` para renderizar o token de pareamento como QR escaneavel
 
 ## Regras de negocio
 - O portal usa a mesma sessao admin do hub inicial.
+- A navegacao fica no grupo `WhatsApp` do sidebar compartilhado.
 - O dashboard mostra o estado da conexao e cards de operacao.
 - A area de automacoes permite criar, pausar, disparar e excluir regras.
 - A pagina de logs filtra eventos por status e quantidade.

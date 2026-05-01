@@ -14,6 +14,7 @@ Area de recrutamento para usuarios RH e TECH com navegacao condicional por perfi
 - `client/app/rh/tech/dashboard/page.tsx`
 - `client/app/rh/tech/interviews/[id]/page.tsx`
 - `client/components/rh/rh-layout.tsx`
+- `client/components/layout/app-shell.tsx`
 - `client/components/rh/*.tsx`
 - `client/lib/rh-api.ts`
 - `client/lib/rh-session.ts`
@@ -36,12 +37,13 @@ Area de recrutamento para usuarios RH e TECH com navegacao condicional por perfi
 
 ## Dependencias
 - Token RH
-- `RhLayout` para navegacao por papel
+- `RhLayout` renderiza o `AppShell` compartilhado
 - login unificado em `/login?role=rh`
 - API de recrutamento em `/rh/*`
 
 ## Regras de negocio
 - O menu muda conforme o papel do usuario.
+- A navegacao fica no grupo `RH Recruiter` do sidebar compartilhado.
 - RH ve painel, candidatos, vagas e templates.
 - TECH ve apenas as telas de entrevista atribuida.
 - O login redireciona para o painel correspondente ao papel do usuario.
