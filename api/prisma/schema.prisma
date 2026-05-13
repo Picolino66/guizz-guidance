@@ -404,6 +404,7 @@ model WhatsappAutomation {
   status               WhatsappAutomationStatus @default(ACTIVE)
   targetType           WhatsappAutomationTargetType?
   targetJid            String?
+  targetJids           String[]                @default([])
   imageBase64          String?
   imageMimeType        String?
   imageFileName        String?

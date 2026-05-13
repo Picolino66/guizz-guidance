@@ -235,6 +235,13 @@ export function WhatsappDashboardPageClient() {
 }
 
 function AutomationRow({ automation }: { automation: WhatsappAutomation }) {
+  const targetSummary =
+    automation.targetType === "CONTACT"
+      ? automation.targetJids.length > 1
+        ? `${automation.targetJids.length} contatos`
+        : automation.targetJids[0] ?? automation.targetJid ?? "—"
+      : automation.targetJid ?? "—"
+
   return (
     <article className="whatsapp-row">
       <div>
@@ -243,7 +250,7 @@ function AutomationRow({ automation }: { automation: WhatsappAutomation }) {
           {automation.kind} · {automation.nextRunAt ? `Próximo: ${new Date(automation.nextRunAt).toLocaleString("pt-BR")}` : "Sem próxima execução"}
         </p>
         <p>
-          {automation.targetType === "GROUP" ? "Grupo" : automation.targetType === "CONTACT" ? "Contato" : "Sem destino"} · {automation.targetJid ?? "—"}
+          {automation.targetType === "GROUP" ? "Grupo" : automation.targetType === "CONTACT" ? "Contato" : "Sem destino"} · {targetSummary}
         </p>
       </div>
       <span className={`whatsapp-pill whatsapp-pill--${automation.status.toLowerCase()}`}>{automation.status}</span>

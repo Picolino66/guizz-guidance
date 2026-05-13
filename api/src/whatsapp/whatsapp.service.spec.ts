@@ -46,6 +46,7 @@ function makeAutomation(overrides: Partial<WhatsappAutomation> = {}): WhatsappAu
     status: WhatsappAutomationStatus.ACTIVE,
     targetType: WhatsappAutomationTargetType.GROUP,
     targetJid: "120363000000000000@g.us",
+    targetJids: [],
     imageBase64: null,
     imageMimeType: null,
     imageFileName: null,
@@ -71,7 +72,7 @@ function makeLog(overrides: Partial<WhatsappDispatchLog> = {}): WhatsappDispatch
     id: "log-1",
     automationId: "automation-1",
     connectionId: "connection-1",
-    dispatchKey: "automation-1:2026-04-30T10:05:00.000Z",
+    dispatchKey: "automation-1:2026-04-30T10:05:00.000Z:120363000000000000@g.us",
     targetType: WhatsappAutomationTargetType.GROUP,
     targetJid: "120363000000000000@g.us",
     message: "Mensagem",
@@ -408,6 +409,143 @@ describe("WhatsappService", () => {
       image: null,
       mentions: []
     })
+  })
+
+  it("envia automacao para multiplos contatos em mensagens separadas", async () => {
+    const sentMessages: Array<{ jid: string; payload: unknown }> = []
+    const createdLogMessages: Array<{ targetJid?: string; message?: string; dispatchKey?: string }> = []
+    const automation = makeAutomation({
+      message: "Olá, [nome]! Seu lembrete chegou.",
+      targetType: WhatsappAutomationTargetType.CONTACT,
+      targetJid: "5511999999999@s.whatsapp.net",
+      targetJids: ["5511999999999@s.whatsapp.net", "5511888888888@s.whatsapp.net"]
+    })
+    const prisma = {
+      whatsappConnection: {
+        upsert: async () => makeConnection()
+      },
+      contact: {
+        findUnique: async ({ where }: { where: { phoneNumber: string } }) => {
+          if (where.phoneNumber === "5511999999999") {
+            return makeContact()
+          }
+
+          if (where.phoneNumber === "5511888888888") {
+            return makeContact({
+              id: "contact-2",
+              name: "João Souza",
+              email: "joao@guidance.dev",
+              phoneNumber: "5511888888888",
+              searchText: "joao souza joao@guidance.dev 5511888888888"
+            })
+          }
+
+          return null
+        }
+      },
+      whatsappDispatchLog: {
+        findUnique: async () => null,
+        create: async ({ data }: { data: Partial<WhatsappDispatchLog> }) => {
+          createdLogMessages.push({
+            targetJid: data.targetJid,
+            message: data.message,
+            dispatchKey: data.dispatchKey
+          })
+          return makeLog({
+            ...data,
+            id: `log-${createdLogMessages.length}`,
+            targetType: WhatsappAutomationTargetType.CONTACT,
+            targetJid: data.targetJid ?? "5511999999999@s.whatsapp.net",
+            dispatchKey: data.dispatchKey ?? `dispatch-${createdLogMessages.length}`,
+            status: WhatsappDispatchStatus.PENDING,
+            sentAt: null,
+            attempts: 1,
+            errorMessage: null
+          })
+        },
+        update: async ({ where, data }: { where: { id: string }; data: Partial<WhatsappDispatchLog> }) =>
+          makeLog({
+            id: where.id,
+            ...data,
+            targetType: WhatsappAutomationTargetType.CONTACT,
+            targetJid: where.id === "log-1" ? "5511999999999@s.whatsapp.net" : "5511888888888@s.whatsapp.net"
+          })
+      },
+      whatsappAutomation: {
+        update: async ({ data }: { data: Partial<WhatsappAutomation> }) => makeAutomation({ ...automation, ...data })
+      }
+    }
+    const adapter = {
+      isReady: () => true,
+      sendMessage: async (jid: string, payload: unknown) => {
+        sentMessages.push({ jid, payload })
+      }
+    }
+    const service = createService(prisma, adapter)
+    const dispatchAutomation = getDispatch(service)
+
+    const result = await dispatchAutomation(automation, "scheduler") as {
+      automation: {
+        targetType: WhatsappAutomationTargetType
+        targetJid: string | null
+        targetJids: string[]
+        lastStatus: WhatsappDispatchStatus | null
+        lastError: string | null
+      }
+      logs: Array<{
+        targetJid: string
+        status: WhatsappDispatchStatus
+      }>
+    }
+
+    assert.equal(createdLogMessages.length, 2)
+    assert.deepEqual(createdLogMessages.map((item) => item.targetJid), [
+      "5511999999999@s.whatsapp.net",
+      "5511888888888@s.whatsapp.net"
+    ])
+    assert.deepEqual(createdLogMessages.map((item) => item.message), [
+      "Olá, Maria Silva! Seu lembrete chegou.",
+      "Olá, João Souza! Seu lembrete chegou."
+    ])
+    assert.deepEqual(sentMessages, [
+      {
+        jid: "5511999999999@s.whatsapp.net",
+        payload: {
+          text: "Olá, Maria Silva! Seu lembrete chegou.",
+          image: null,
+          mentions: []
+        }
+      },
+      {
+        jid: "5511888888888@s.whatsapp.net",
+        payload: {
+          text: "Olá, João Souza! Seu lembrete chegou.",
+          image: null,
+          mentions: []
+        }
+      }
+    ])
+    assert.equal(result.automation.targetType, WhatsappAutomationTargetType.CONTACT)
+    assert.equal(result.automation.targetJid, "5511999999999@s.whatsapp.net")
+    assert.deepEqual(result.automation.targetJids, [
+      "5511999999999@s.whatsapp.net",
+      "5511888888888@s.whatsapp.net"
+    ])
+    assert.equal(result.automation.lastStatus, WhatsappDispatchStatus.SENT)
+    assert.equal(result.automation.lastError, null)
+    assert.deepEqual(
+      result.logs.map((log) => ({ targetJid: log.targetJid, status: log.status })),
+      [
+        {
+          targetJid: "5511999999999@s.whatsapp.net",
+          status: WhatsappDispatchStatus.SENT
+        },
+        {
+          targetJid: "5511888888888@s.whatsapp.net",
+          status: WhatsappDispatchStatus.SENT
+        }
+      ]
+    )
   })
 
   it("lista participantes do grupo informado para autocomplete", async () => {

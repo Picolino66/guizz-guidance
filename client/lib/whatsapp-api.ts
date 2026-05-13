@@ -32,6 +32,7 @@ export interface WhatsappAutomation {
   status: WhatsappAutomationStatus
   targetType: WhatsappAutomationTargetType | null
   targetJid: string | null
+  targetJids: string[]
   imageBase64: string | null
   imageMimeType: WhatsappImageMimeType | null
   imageFileName: string | null

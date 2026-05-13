@@ -44,6 +44,13 @@ export class UpdateWhatsappAutomationDto {
   targetJid?: string
 
   @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  targetJids?: string[]
+
+  @IsOptional()
   @IsString()
   imageBase64?: string
 

@@ -63,6 +63,12 @@ interface WhatsappRichMessagePayload {
   mentionJids: string[]
 }
 
+interface WhatsappAutomationTargetInput {
+  type: WhatsappAutomationTargetType
+  primaryJid: string
+  jids: string[]
+}
+
 export interface WhatsappConnectionView {
   id: string
   key: string
@@ -87,6 +93,7 @@ export interface WhatsappAutomationView {
   status: WhatsappAutomationStatus
   targetType: WhatsappAutomationTargetType | null
   targetJid: string | null
+  targetJids: string[]
   imageBase64: string | null
   imageMimeType: string | null
   imageFileName: string | null
@@ -325,7 +332,7 @@ export class WhatsappService implements OnModuleInit {
   async createAutomation(dto: CreateWhatsappAutomationDto) {
     const connection = await this.ensurePrimaryConnection()
     this.validateAutomationSchedule(dto.kind, dto)
-    const target = this.resolveTargetInput(dto.targetType, dto.targetJid)
+    const target = this.resolveTargetInput(dto.targetType, dto.targetJid, dto.targetJids)
     const richMessage = this.normalizeRichMessagePayload(dto)
     const nextRunAt = this.resolveNextRunAt(dto.kind, dto)
 
@@ -337,7 +344,8 @@ export class WhatsappService implements OnModuleInit {
         kind: dto.kind,
         status: dto.status ?? WhatsappAutomationStatus.ACTIVE,
         targetType: target.type,
-        targetJid: target.jid,
+        targetJid: target.primaryJid,
+        targetJids: target.jids,
         imageBase64: richMessage.imageBase64,
         imageMimeType: richMessage.imageMimeType,
         imageFileName: richMessage.imageFileName,
@@ -358,7 +366,11 @@ export class WhatsappService implements OnModuleInit {
   async updateAutomation(id: string, dto: UpdateWhatsappAutomationDto) {
     const existing = await this.ensureAutomation(id)
     const kind = dto.kind ?? existing.kind
-    const target = this.resolveTargetInput(dto.targetType ?? existing.targetType, dto.targetJid ?? existing.targetJid)
+    const target = this.resolveTargetInput(
+      dto.targetType ?? existing.targetType,
+      dto.targetJid ?? existing.targetJid,
+      dto.targetJids ?? existing.targetJids
+    )
     const runtimeInput = {
       scheduledFor: dto.scheduledFor ?? existing.scheduledFor?.toISOString() ?? null,
       timeOfDay: dto.timeOfDay ?? existing.timeOfDay,
@@ -392,7 +404,14 @@ export class WhatsappService implements OnModuleInit {
         kind: dto.kind,
         status: dto.status,
         targetType: dto.targetType === undefined ? undefined : target.type,
-        targetJid: dto.targetJid === undefined ? undefined : target.jid,
+        targetJid:
+          dto.targetType === undefined && dto.targetJid === undefined && dto.targetJids === undefined
+            ? undefined
+            : target.primaryJid,
+        targetJids:
+          dto.targetType === undefined && dto.targetJid === undefined && dto.targetJids === undefined
+            ? undefined
+            : target.jids,
         imageBase64: richMessage ? richMessage.imageBase64 : undefined,
         imageMimeType: richMessage ? richMessage.imageMimeType : undefined,
         imageFileName: richMessage ? richMessage.imageFileName : undefined,
@@ -456,7 +475,7 @@ export class WhatsappService implements OnModuleInit {
         connectionId: connection.id,
         dispatchKey,
         targetType: target.type,
-        targetJid: target.jid,
+        targetJid: target.primaryJid,
         message: richMessage.message,
         status: WhatsappDispatchStatus.PENDING,
         attempts: 1,
@@ -466,7 +485,7 @@ export class WhatsappService implements OnModuleInit {
     })
 
     try {
-      await this.sendMessage(target.jid, richMessage)
+      await this.sendMessage(target.primaryJid, richMessage)
       const row = await this.prisma.whatsappDispatchLog.update({
         where: { id: log.id },
         data: {
@@ -647,7 +666,9 @@ export class WhatsappService implements OnModuleInit {
 
   private async dispatchAutomation(automation: WhatsappAutomation, triggeredBy: string) {
     const connection = await this.ensurePrimaryConnection()
-    if (!automation.targetType || !automation.targetJid) {
+    const targetJids = this.getAutomationTargetJids(automation)
+
+    if (!automation.targetType || targetJids.length === 0) {
       const row = await this.prisma.whatsappDispatchLog.create({
         data: {
           automationId: automation.id,
@@ -676,26 +697,102 @@ export class WhatsappService implements OnModuleInit {
       return this.toLogView(row)
     }
 
-    const richMessage = await this.resolveAutomationMessagePayload(automation)
-    const metadata = this.buildDispatchMetadata(richMessage)
-
     const scheduledFor = automation.nextRunAt ?? new Date()
-    const dispatchKey = `${automation.id}:${scheduledFor.toISOString()}`
+
+    const results = []
+    for (const targetJid of targetJids) {
+      results.push(await this.dispatchAutomationToTarget(automation, connection.id, scheduledFor, triggeredBy, targetJid))
+    }
+
+    if (results.every((item) => !item.wasCreatedFromDispatch)) {
+      if (results.length === 1) {
+        return this.toLogView(results[0].log)
+      }
+
+      return {
+        logs: results.map((item) => this.toLogView(item.log))
+      }
+    }
+
+    const statuses = results.map((item) => item.log.status)
+    const failedResults = results.filter((item) => item.log.status === WhatsappDispatchStatus.FAILED)
+    const skippedResults = results.filter((item) => item.log.status === WhatsappDispatchStatus.SKIPPED)
+    const lastStatus = failedResults.length > 0
+      ? WhatsappDispatchStatus.FAILED
+      : statuses.every((status) => status === WhatsappDispatchStatus.SKIPPED)
+        ? WhatsappDispatchStatus.SKIPPED
+        : WhatsappDispatchStatus.SENT
+    const lastError = failedResults.length > 0
+      ? failedResults.map((item) => item.log.errorMessage).filter(Boolean).join(" | ")
+      : skippedResults.length === results.length
+        ? skippedResults.map((item) => item.log.errorMessage).filter(Boolean).join(" | ")
+        : null
+
+    const updatedAutomation = await this.prisma.whatsappAutomation.update({
+      where: { id: automation.id },
+      data: {
+        lastRunAt: new Date(),
+        lastStatus,
+        lastError,
+        nextRunAt: this.getNextAutomationRunAt(automation, scheduledFor)
+      }
+    })
+
+    if (results.length === 1) {
+      const [result] = results
+
+      if (!result.wasCreatedFromDispatch) {
+        return this.toLogView(result.log)
+      }
+
+      return {
+        automation: this.toAutomationView(updatedAutomation),
+        log: this.toLogView(result.log)
+      }
+    }
+
+    return {
+      automation: this.toAutomationView(updatedAutomation),
+      logs: results.map((item) => this.toLogView(item.log))
+    }
+  }
+
+  private async sendMessage(targetJid: string, payload: WhatsappRichMessagePayload) {
+    if (!this.adapter.isReady()) {
+      throw new BadRequestException("A conexão WhatsApp ainda não está pronta.")
+    }
+
+    await this.adapter.sendMessage(targetJid, this.toOutboundMessage(payload))
+  }
+
+  private async dispatchAutomationToTarget(
+    automation: WhatsappAutomation,
+    connectionId: string,
+    scheduledFor: Date,
+    triggeredBy: string,
+    targetJid: string
+  ) {
+    const richMessage = await this.resolveAutomationMessagePayload(automation, targetJid)
+    const metadata = this.buildDispatchMetadata(richMessage)
+    const dispatchKey = `${automation.id}:${scheduledFor.toISOString()}:${targetJid}`
     const existingLog = await this.prisma.whatsappDispatchLog.findUnique({
       where: { dispatchKey }
     })
 
     if (existingLog) {
-      return this.toLogView(existingLog)
+      return {
+        log: existingLog,
+        wasCreatedFromDispatch: false
+      }
     }
 
     const log = await this.prisma.whatsappDispatchLog.create({
       data: {
         automationId: automation.id,
-        connectionId: connection.id,
+        connectionId,
         dispatchKey,
-        targetType: automation.targetType,
-        targetJid: automation.targetJid,
+        targetType: automation.targetType ?? WhatsappAutomationTargetType.CONTACT,
+        targetJid,
         message: richMessage.message,
         status: WhatsappDispatchStatus.PENDING,
         attempts: 1,
@@ -706,27 +803,16 @@ export class WhatsappService implements OnModuleInit {
     })
 
     try {
-      await this.sendMessage(automation.targetJid, richMessage)
-      const updatedAutomation = await this.prisma.whatsappAutomation.update({
-        where: { id: automation.id },
-        data: {
-          lastRunAt: new Date(),
-          lastStatus: WhatsappDispatchStatus.SENT,
-          lastError: null,
-          nextRunAt: this.getNextAutomationRunAt(automation, scheduledFor)
-        }
-      })
-      const updatedLog = await this.prisma.whatsappDispatchLog.update({
-        where: { id: log.id },
-        data: {
-          status: WhatsappDispatchStatus.SENT,
-          sentAt: new Date()
-        }
-      })
-
+      await this.sendMessage(targetJid, richMessage)
       return {
-        automation: this.toAutomationView(updatedAutomation),
-        log: this.toLogView(updatedLog)
+        log: await this.prisma.whatsappDispatchLog.update({
+          where: { id: log.id },
+          data: {
+            status: WhatsappDispatchStatus.SENT,
+            sentAt: new Date()
+          }
+        }),
+        wasCreatedFromDispatch: true
       }
     } catch (error) {
       const retryError = this.getErrorMessage(error)
@@ -741,68 +827,38 @@ export class WhatsappService implements OnModuleInit {
       })
 
       try {
-        await this.sendMessage(automation.targetJid, richMessage)
-        const updatedAutomation = await this.prisma.whatsappAutomation.update({
-          where: { id: automation.id },
-          data: {
-            lastRunAt: new Date(),
-            lastStatus: WhatsappDispatchStatus.SENT,
-            lastError: null,
-            nextRunAt: this.getNextAutomationRunAt(automation, scheduledFor)
-          }
-        })
-        const updatedLog = await this.prisma.whatsappDispatchLog.update({
-          where: { id: log.id },
-          data: {
-            status: WhatsappDispatchStatus.SENT,
-            sentAt: new Date(),
-            attempts: 2,
-            errorMessage: null
-          }
-        })
-
+        await this.sendMessage(targetJid, richMessage)
         return {
-          automation: this.toAutomationView(updatedAutomation),
-          log: this.toLogView(updatedLog)
+          log: await this.prisma.whatsappDispatchLog.update({
+            where: { id: log.id },
+            data: {
+              status: WhatsappDispatchStatus.SENT,
+              sentAt: new Date(),
+              attempts: 2,
+              errorMessage: null
+            }
+          }),
+          wasCreatedFromDispatch: true
         }
       } catch (retryErrorValue) {
-        const failedAutomation = await this.prisma.whatsappAutomation.update({
-          where: { id: automation.id },
-          data: {
-            lastRunAt: new Date(),
-            lastStatus: WhatsappDispatchStatus.FAILED,
-            lastError: this.getErrorMessage(retryErrorValue),
-            nextRunAt: this.getNextAutomationRunAt(automation, scheduledFor)
-          }
-        })
-        const failedLog = await this.prisma.whatsappDispatchLog.update({
-          where: { id: log.id },
-          data: {
-            status: WhatsappDispatchStatus.FAILED,
-            attempts: 2,
-            errorMessage: this.getErrorMessage(retryErrorValue)
-          }
-        })
-
         return {
-          automation: this.toAutomationView(failedAutomation),
-          log: this.toLogView(failedLog)
+          log: await this.prisma.whatsappDispatchLog.update({
+            where: { id: log.id },
+            data: {
+              status: WhatsappDispatchStatus.FAILED,
+              attempts: 2,
+              errorMessage: this.getErrorMessage(retryErrorValue)
+            }
+          }),
+          wasCreatedFromDispatch: true
         }
       }
     }
   }
 
-  private async sendMessage(targetJid: string, payload: WhatsappRichMessagePayload) {
-    if (!this.adapter.isReady()) {
-      throw new BadRequestException("A conexão WhatsApp ainda não está pronta.")
-    }
-
-    await this.adapter.sendMessage(targetJid, this.toOutboundMessage(payload))
-  }
-
-  private async resolveAutomationMessagePayload(automation: WhatsappAutomation) {
+  private async resolveAutomationMessagePayload(automation: WhatsappAutomation, targetJid: string) {
     return this.normalizeRichMessagePayload({
-      message: await this.resolveAutomationMessage(automation),
+      message: await this.resolveAutomationMessage(automation, targetJid),
       imageBase64: automation.imageBase64,
       imageMimeType: automation.imageMimeType,
       imageFileName: automation.imageFileName,
@@ -810,16 +866,15 @@ export class WhatsappService implements OnModuleInit {
     })
   }
 
-  private async resolveAutomationMessage(automation: WhatsappAutomation) {
+  private async resolveAutomationMessage(automation: WhatsappAutomation, targetJid: string) {
     if (
       automation.targetType !== WhatsappAutomationTargetType.CONTACT ||
-      !automation.targetJid ||
       !automation.message.toLowerCase().includes("[nome]")
     ) {
       return automation.message
     }
 
-    const phoneNumber = this.extractPhoneNumberFromContactJid(automation.targetJid)
+    const phoneNumber = this.extractPhoneNumberFromContactJid(targetJid)
 
     if (!phoneNumber) {
       throw new BadRequestException("Não foi possível identificar o telefone do contato da automação.")
@@ -1254,6 +1309,7 @@ export class WhatsappService implements OnModuleInit {
       status: automation.status,
       targetType: automation.targetType,
       targetJid: automation.targetJid,
+      targetJids: automation.targetJids,
       imageBase64: automation.imageBase64,
       imageMimeType: automation.imageMimeType,
       imageFileName: automation.imageFileName,
@@ -1341,19 +1397,73 @@ export class WhatsappService implements OnModuleInit {
     return normalized ? normalized : null
   }
 
-  private resolveTargetInput(targetType?: WhatsappAutomationTargetType | null, targetJid?: string | null) {
-    const normalizedTargetJid = this.normalizeOptionalString(targetJid)
+  private getAutomationTargetJids(automation: Pick<WhatsappAutomation, "targetType" | "targetJid" | "targetJids">) {
+    if (automation.targetType === WhatsappAutomationTargetType.GROUP) {
+      return automation.targetJid ? [automation.targetJid] : []
+    }
 
-    if (!targetType || !normalizedTargetJid) {
+    const normalizedTargetJids = this.normalizeTargetJids(automation.targetJids)
+
+    if (normalizedTargetJids.length > 0) {
+      return normalizedTargetJids
+    }
+
+    return automation.targetJid ? this.normalizeTargetJids([automation.targetJid]) : []
+  }
+
+  private resolveTargetInput(
+    targetType?: WhatsappAutomationTargetType | null,
+    targetJid?: string | null,
+    targetJids?: string[] | null
+  ): WhatsappAutomationTargetInput {
+    if (!targetType) {
       throw new BadRequestException("Informe o tipo e o destino da automação.")
     }
 
-    this.validateTargetJid(targetType, normalizedTargetJid)
+    if (targetType === WhatsappAutomationTargetType.GROUP) {
+      const normalizedTargetJid = this.normalizeOptionalString(targetJid)
+
+      if (!normalizedTargetJid) {
+        throw new BadRequestException("Selecione um grupo como destino da automação.")
+      }
+
+      this.validateGroupJid(normalizedTargetJid)
+
+      return {
+        type: targetType,
+        primaryJid: normalizedTargetJid,
+        jids: []
+      }
+    }
+
+    const resolvedTargetJids = this.normalizeTargetJids(targetJids ?? (targetJid ? [targetJid] : []))
+
+    if (resolvedTargetJids.length === 0) {
+      throw new BadRequestException("Selecione ao menos um contato como destino da automação.")
+    }
 
     return {
       type: targetType,
-      jid: normalizedTargetJid
+      primaryJid: resolvedTargetJids[0],
+      jids: resolvedTargetJids
     }
+  }
+
+  private normalizeTargetJids(values?: string[] | null) {
+    const normalizedTargetJids = new Set<string>()
+
+    for (const value of values ?? []) {
+      const normalized = this.normalizeOptionalString(value)
+
+      if (!normalized) {
+        continue
+      }
+
+      this.validateContactJid(normalized)
+      normalizedTargetJids.add(normalized)
+    }
+
+    return [...normalizedTargetJids]
   }
 
   private validateGroupJid(value?: string | null) {

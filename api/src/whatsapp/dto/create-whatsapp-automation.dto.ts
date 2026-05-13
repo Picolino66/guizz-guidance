@@ -35,8 +35,16 @@ export class CreateWhatsappAutomationDto {
   @IsEnum(WhatsappAutomationTargetType)
   targetType!: WhatsappAutomationTargetType
 
+  @IsOptional()
   @IsString()
-  targetJid!: string
+  targetJid?: string
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  targetJids?: string[]
 
   @IsOptional()
   @IsString()

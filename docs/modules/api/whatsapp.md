@@ -35,7 +35,7 @@ Dominio administrativo para conectar uma sessao WhatsApp, cadastrar automacoes, 
 - Logs de execucao e falha
 - Disparo manual de teste
 - Mensagens WhatsApp com texto, foto opcional e mencoes manuais
-- Destino explicito por automacao com `targetType` (`GROUP` ou `CONTACT`) e `targetJid`
+- Destino explicito por automacao com `targetType` (`GROUP` ou `CONTACT`), `targetJid` e suporte a `targetJids` para contato multiplo
 - Catalogo persistido de grupos para autocomplete de destino
 - Contatos da agenda interna elegiveis para WhatsApp, usados em destino e mencoes
 - Sincronizacao manual da sessao com o WhatsApp Web para atualizar e persistir o catalogo de grupos
@@ -55,14 +55,15 @@ Dominio administrativo para conectar uma sessao WhatsApp, cadastrar automacoes, 
 - O backend mantem uma conexao principal e multiplas automacoes.
 - O scheduler processa apenas automacoes ativas, com `nextRunAt` vencido e sessao realmente `READY`.
 - Uma automacao pode ser one-shot, lembrete, diaria, semanal, mensal ou aniversario.
-- Cada automacao precisa de um destino explicito: grupo ou contato individual.
+- Cada automacao precisa de um destino explicito: um grupo ou um ou mais contatos.
 - Automacoes e `POST /whatsapp/test-message` aceitam `imageBase64`, `imageMimeType`, `imageFileName` e `mentionNumbers`.
 - `imageBase64` pode ser Base64 puro ou `data:image/...;base64,...`; apenas JPEG, PNG e WebP sao aceitos, com limite de 5 MB depois da decodificacao.
 - O bootstrap da API aceita JSON/urlencoded ate 8 MB para comportar o overhead de Base64; a regra de negocio continua limitada a 5 MB decodificados.
 - Menções podem vir de `mentionNumbers` ou de marcacoes `@numero` dentro de `message`; o backend normaliza para `${digits}@s.whatsapp.net` e remove duplicados.
 - `GET /whatsapp/groups` le o catalogo persistido no banco, aceita `search` opcional e nao depende de sessao `READY`.
 - `GET /whatsapp/contacts` le a agenda interna `Contact`, aceita `search` opcional e retorna apenas registros com telefone, convertendo o numero salvo para `jid = ${phoneNumber}@s.whatsapp.net`.
-- Durante o disparo de automacoes com destino `CONTACT`, o placeholder `[nome]` no campo `message` e substituido pelo nome salvo do contato correspondente ao `targetJid`.
+- Durante o disparo de automacoes com destino `CONTACT`, o backend usa `targetJids` para fazer fan-out e enviar uma mensagem separada para cada contato.
+- Durante o disparo de automacoes com destino `CONTACT`, o placeholder `[nome]` no campo `message` e substituido pelo nome salvo do contato correspondente a cada destinatario.
 - `POST /whatsapp/sync` exige sessao `READY`, força um `resyncAppState` da sessao e faz upsert dos grupos no banco.
 - Grupos que sumirem em sincronizacoes futuras permanecem salvos, mas ficam com `isAvailable = false` e saem do autocomplete.
 - A busca de grupos e contatos usa campos persistidos `searchText`, sem diferenciar acentos, maiusculas e minusculas.

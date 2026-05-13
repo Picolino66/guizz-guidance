@@ -81,6 +81,22 @@ function formatTargetTypeLabel(value: WhatsappAutomationTargetType) {
   return value === "GROUP" ? "Grupo" : "Contato"
 }
 
+function formatAutomationTargetSummary(automation: WhatsappAutomation) {
+  if (automation.targetType === "CONTACT") {
+    if (automation.targetJids.length === 0) {
+      return automation.targetJid ?? "—"
+    }
+
+    if (automation.targetJids.length === 1) {
+      return automation.targetJids[0]
+    }
+
+    return `${automation.targetJids.length} contatos`
+  }
+
+  return automation.targetJid ?? "—"
+}
+
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -164,7 +180,7 @@ export function WhatsappAutomationsPageClient() {
   const [targetOptionsVisible, setTargetOptionsVisible] = useState(false)
   const [syncingDirectory, setSyncingDirectory] = useState(false)
   const [targetOptionsError, setTargetOptionsError] = useState<string | null>(null)
-  const [selectedTarget, setSelectedTarget] = useState<WhatsappTargetOption | null>(null)
+  const [selectedTargets, setSelectedTargets] = useState<WhatsappTargetOption[]>([])
   const [scheduleDate, setScheduleDate] = useState("")
   const [timeOfDay, setTimeOfDay] = useState("09:00")
   const [daysOfWeek, setDaysOfWeek] = useState("1,2,3,4,5")
@@ -206,7 +222,7 @@ export function WhatsappAutomationsPageClient() {
     setTargetOptions([])
     setTargetOptionsVisible(false)
     setTargetOptionsError(null)
-    setSelectedTarget(null)
+    setSelectedTargets([])
     setMentionOptions([])
     setMentionOptionsError(null)
     setSelectedMentions([])
@@ -336,7 +352,7 @@ export function WhatsappAutomationsPageClient() {
       return
     }
 
-    if (targetType !== "GROUP" || !selectedTarget) {
+    if (targetType !== "GROUP" || selectedTargets.length === 0) {
       setMentionOptions([])
       setMentionOptionsLoading(false)
       setMentionOptionsError("Selecione um grupo como destino para usar menções.")
@@ -350,13 +366,18 @@ export function WhatsappAutomationsPageClient() {
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [mentionSearch, selectedTarget, targetType])
+  }, [mentionSearch, selectedTargets, targetType])
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!selectedTarget) {
-      setError("Selecione um destino antes de criar a automação.")
+    if (targetType === "GROUP" && selectedTargets.length === 0) {
+      setError("Selecione um grupo antes de criar a automação.")
+      return
+    }
+
+    if (targetType === "CONTACT" && selectedTargets.length === 0) {
+      setError("Selecione ao menos um contato antes de criar a automação.")
       return
     }
 
@@ -368,9 +389,15 @@ export function WhatsappAutomationsPageClient() {
       title,
       message,
       kind,
-      targetType,
-      targetJid: selectedTarget.jid
+      targetType
     }
+
+    if (targetType === "GROUP") {
+      payload.targetJid = selectedTargets[0]?.jid
+    } else {
+      payload.targetJids = selectedTargets.map((target) => target.jid)
+    }
+
     const activeMentions = selectedMentions.filter((contact) => message.includes(contact.mentionToken))
 
     if (activeMentions.length > 0) {
@@ -415,7 +442,7 @@ export function WhatsappAutomationsPageClient() {
       setTitle("")
       setMessage("")
       setTargetQuery("")
-      setSelectedTarget(null)
+      setSelectedTargets([])
       setSelectedMentions([])
       setMentionSearch(null)
       setMentionOptions([])
@@ -480,7 +507,7 @@ export function WhatsappAutomationsPageClient() {
       return
     }
 
-    if (targetType !== "GROUP" || !selectedTarget) {
+    if (targetType !== "GROUP" || selectedTargets.length === 0) {
       setMentionOptions([])
       setMentionOptionsError("Selecione um grupo como destino para usar menções.")
       return
@@ -531,8 +558,20 @@ export function WhatsappAutomationsPageClient() {
   }
 
   function handleSelectTarget(option: WhatsappTargetOption) {
-    setSelectedTarget(option)
-    setTargetQuery(option.label)
+    if (targetType === "GROUP") {
+      setSelectedTargets([option])
+      setTargetQuery(option.label)
+    } else {
+      setSelectedTargets((current) => {
+        if (current.some((item) => item.jid === option.jid)) {
+          return current
+        }
+
+        return [...current, option]
+      })
+      setTargetQuery("")
+    }
+
     setTargetOptionsError(null)
     setTargetOptionsVisible(false)
     setMentionOptions([])
@@ -545,11 +584,19 @@ export function WhatsappAutomationsPageClient() {
     setTargetQuery(value)
     setTargetOptionsVisible(true)
     setTargetOptionsError(null)
-    setSelectedTarget(null)
+
+    if (targetType === "GROUP") {
+      setSelectedTargets([])
+    }
+
     setMentionOptions([])
     setMentionOptionsError(null)
     setSelectedMentions([])
     setMentionSearch(null)
+  }
+
+  function removeSelectedTarget(jid: string) {
+    setSelectedTargets((current) => current.filter((item) => item.jid !== jid))
   }
 
   async function runNow(id: string) {
@@ -597,6 +644,7 @@ export function WhatsappAutomationsPageClient() {
   const canDispatch = connection?.status === "READY"
   const visibleAutomations = automations.filter(shouldShowAutomation)
   const mentionSuggestions = mentionOptions.slice(0, MAX_MENTION_SUGGESTIONS)
+  const selectedGroup = targetType === "GROUP" ? selectedTargets[0] ?? null : null
 
   return (
     <section className="whatsapp-page">
@@ -664,10 +712,26 @@ export function WhatsappAutomationsPageClient() {
                 </div>
               )}
 
-              {selectedTarget && (
+              {selectedGroup && (
                 <p className="whatsapp-form-hint">
-                  Destino selecionado: <strong>{selectedTarget.label}</strong> · {selectedTarget.secondaryLabel}
+                  Destino selecionado: <strong>{selectedGroup.label}</strong> · {selectedGroup.secondaryLabel}
                 </p>
+              )}
+
+              {targetType === "CONTACT" && selectedTargets.length > 0 && (
+                <div className="whatsapp-form-hint">
+                  Contatos selecionados: {selectedTargets.length}
+                  {selectedTargets.map((target) => (
+                    <button
+                      key={target.jid}
+                      type="button"
+                      className="whatsapp-button whatsapp-button--ghost"
+                      onClick={() => removeSelectedTarget(target.jid)}
+                    >
+                      {target.label} · remover
+                    </button>
+                  ))}
+                </div>
               )}
 
               {targetOptionsError && <p className="whatsapp-form-hint whatsapp-form-hint--error">{targetOptionsError}</p>}
@@ -693,6 +757,12 @@ export function WhatsappAutomationsPageClient() {
               {targetOptionsVisible && !targetOptionsLoading && targetOptions.length === 0 && !targetOptionsError && (
                 <p className="whatsapp-form-hint">Nenhum destino encontrado para a busca atual.</p>
               )}
+
+              {targetType === "CONTACT" && (
+                <p className="whatsapp-form-hint">
+                  Selecione quantos contatos quiser. A automação enviará uma mensagem separada para cada pessoa.
+                </p>
+              )}
             </div>
 
             <label>
@@ -711,7 +781,7 @@ export function WhatsappAutomationsPageClient() {
 
             {targetType === "CONTACT" && (
               <p className="whatsapp-form-hint">
-                Use <strong>[nome]</strong> para inserir automaticamente o nome salvo do contato selecionado.
+                Use <strong>[nome]</strong> para inserir automaticamente o nome salvo de cada contato selecionado.
               </p>
             )}
 
@@ -843,7 +913,7 @@ export function WhatsappAutomationsPageClient() {
                       {automation.kind} · {automation.nextRunAt ? `Próxima execução em ${new Date(automation.nextRunAt).toLocaleString("pt-BR")}` : "Sem agendamento"}
                     </p>
                     <p>
-                      {automation.targetType ? formatTargetTypeLabel(automation.targetType) : "Sem destino"} · {automation.targetJid ?? "—"}
+                      {automation.targetType ? formatTargetTypeLabel(automation.targetType) : "Sem destino"} · {formatAutomationTargetSummary(automation)}
                     </p>
                     {getAutomationEnhancementSummary(automation) && (
                       <p>{getAutomationEnhancementSummary(automation)}</p>
