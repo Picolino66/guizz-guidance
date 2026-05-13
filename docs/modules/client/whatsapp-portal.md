@@ -54,6 +54,7 @@ Area administrativa para operar a conexao WhatsApp, automacoes, logs e status da
 - A automacao de aniversario recebe dia e mes na UI (`DD-MM`) e o client converte para o formato interno esperado pela API.
 - A lista de automacoes mostra apenas regras com disparo futuro (`nextRunAt`) ou regras periodicas.
 - A lista de automacoes mostra um resumo discreto quando a regra tem foto ou mencoes.
+- Os labels visiveis do portal WhatsApp, incluindo status, tipos, acoes e gatilhos de execucao, devem aparecer em portugues.
 - A pagina de logs filtra eventos por status e quantidade.
 - A pagina de conexao ouve `whatsapp_session_updated` e mantem polling enquanto a sessao esta conectando ou aguardando QR.
 - Disparos manuais ficam bloqueados ate a sessao estar `READY`.

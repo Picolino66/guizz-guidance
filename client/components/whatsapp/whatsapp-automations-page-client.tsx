@@ -13,6 +13,7 @@ import {
   type WhatsappGroup,
   type WhatsappImageMimeType
 } from "../../lib/whatsapp-api"
+import { whatsappAutomationKindLabels, whatsappAutomationStatusLabels } from "./whatsapp-labels"
 
 const KIND_OPTIONS: Array<{ value: WhatsappAutomation["kind"]; label: string }> = [
   { value: "ONE_SHOT", label: "Aviso único" },
@@ -231,7 +232,7 @@ export function WhatsappAutomationsPageClient() {
 
   async function syncDirectory() {
     if (connection?.status !== "READY") {
-      setTargetOptionsError("Conecte o WhatsApp para sincronizar com o WhatsApp Web.")
+      setTargetOptionsError("Conecte o WhatsApp para sincronizar.")
       return
     }
 
@@ -249,7 +250,7 @@ export function WhatsappAutomationsPageClient() {
       setStatusMessage(`Sincronização concluída: ${result.contactCount} contatos e ${result.groupCount} grupos disponíveis.`)
     } catch (err) {
       if (redirectIfUnauthorized(err, () => router.replace("/login"))) return
-      setTargetOptionsError(err instanceof Error ? err.message : "Não foi possível sincronizar com o WhatsApp Web.")
+      setTargetOptionsError(err instanceof Error ? err.message : "Não foi possível sincronizar com o WhatsApp.")
     } finally {
       setSyncingDirectory(false)
     }
@@ -651,7 +652,7 @@ export function WhatsappAutomationsPageClient() {
       <header className="whatsapp-page__hero">
         <div>
           <p className="whatsapp-page__eyebrow">Automações</p>
-          <h2 className="whatsapp-page__title">Crie regras automações pro WhatsApp</h2>
+          <h2 className="whatsapp-page__title">Crie regras de automação para o WhatsApp</h2>
         </div>
       </header>
 
@@ -707,7 +708,7 @@ export function WhatsappAutomationsPageClient() {
                     disabled={syncingDirectory || targetOptionsLoading || connection?.status !== "READY"}
                     title={connection?.status !== "READY" ? "Conecte o WhatsApp antes de sincronizar" : undefined}
                   >
-                    {syncingDirectory ? "Sincronizando..." : "Sincronizar com WhatsApp Web"}
+                    {syncingDirectory ? "Sincronizando..." : "Sincronizar com WhatsApp"}
                   </button>
                 </div>
               )}
@@ -822,7 +823,7 @@ export function WhatsappAutomationsPageClient() {
 
             {imageBase64 && (
               <div className="whatsapp-image-preview">
-                <img src={imageBase64} alt="Preview da foto selecionada" />
+                <img src={imageBase64} alt="Pré-visualização da foto selecionada" />
                 <div>
                   <strong>{imageFileName}</strong>
                   <button type="button" className="whatsapp-button whatsapp-button--ghost" onClick={clearImage}>
@@ -910,7 +911,7 @@ export function WhatsappAutomationsPageClient() {
                   <div>
                     <strong>{automation.title}</strong>
                     <p>
-                      {automation.kind} · {automation.nextRunAt ? `Próxima execução em ${new Date(automation.nextRunAt).toLocaleString("pt-BR")}` : "Sem agendamento"}
+                      {whatsappAutomationKindLabels[automation.kind]} · {automation.nextRunAt ? `Próxima execução em ${new Date(automation.nextRunAt).toLocaleString("pt-BR")}` : "Sem agendamento"}
                     </p>
                     <p>
                       {automation.targetType ? formatTargetTypeLabel(automation.targetType) : "Sem destino"} · {formatAutomationTargetSummary(automation)}
@@ -921,7 +922,7 @@ export function WhatsappAutomationsPageClient() {
                   </div>
 
                   <div className="whatsapp-list-item__actions">
-                    <span className={`whatsapp-pill whatsapp-pill--${automation.status.toLowerCase()}`}>{automation.status}</span>
+                    <span className={`whatsapp-pill whatsapp-pill--${automation.status.toLowerCase()}`}>{whatsappAutomationStatusLabels[automation.status]}</span>
                     <button className="whatsapp-button whatsapp-button--ghost" onClick={() => void toggleAutomation(automation.id)} disabled={busyAction === automation.id}>
                       {automation.status === "ACTIVE" ? "Pausar" : "Ativar"}
                     </button>

@@ -4,22 +4,12 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { redirectIfUnauthorized } from "../../lib/api"
 import { whatsappFetch, type WhatsappAutomation, type WhatsappConnection, type WhatsappDispatchLog, type WhatsappOverview } from "../../lib/whatsapp-api"
-
-const statusLabels: Record<WhatsappConnection["status"], string> = {
-  DISCONNECTED: "Desconectado",
-  CONNECTING: "Conectando",
-  QR_REQUIRED: "QR necessário",
-  READY: "Conectado",
-  ERROR: "Erro"
-}
-
-const logLabels: Record<WhatsappDispatchLog["status"], string> = {
-  PENDING: "Pendente",
-  RETRYING: "Retentando",
-  SENT: "Enviado",
-  FAILED: "Falhou",
-  SKIPPED: "Ignorado"
-}
+import {
+  whatsappAutomationKindLabels,
+  whatsappAutomationStatusLabels,
+  whatsappDispatchStatusLabels,
+  whatsappStatusLabels
+} from "./whatsapp-labels"
 
 export function WhatsappDashboardPageClient() {
   const router = useRouter()
@@ -96,13 +86,13 @@ export function WhatsappDashboardPageClient() {
     <section className="whatsapp-page">
       <header className="whatsapp-page__hero">
         <div>
-          <p className="whatsapp-page__eyebrow">Dashboard</p>
+          <p className="whatsapp-page__eyebrow">Visão geral</p>
           <h2 className="whatsapp-page__title">Painel operacional</h2>
         </div>
 
         <div className={`whatsapp-status whatsapp-status--${connectionTone}`}>
           <span className="whatsapp-status__dot" />
-          {connection ? statusLabels[connection.status] : "Carregando"}
+          {connection ? whatsappStatusLabels[connection.status] : "Carregando"}
         </div>
       </header>
 
@@ -151,7 +141,7 @@ export function WhatsappDashboardPageClient() {
             </div>
             <div>
               <dt>Status</dt>
-              <dd>{connection ? statusLabels[connection.status] : "—"}</dd>
+              <dd>{connection ? whatsappStatusLabels[connection.status] : "—"}</dd>
             </div>
             <div>
               <dt>Última conexão</dt>
@@ -247,13 +237,13 @@ function AutomationRow({ automation }: { automation: WhatsappAutomation }) {
       <div>
         <strong>{automation.title}</strong>
         <p>
-          {automation.kind} · {automation.nextRunAt ? `Próximo: ${new Date(automation.nextRunAt).toLocaleString("pt-BR")}` : "Sem próxima execução"}
+          {whatsappAutomationKindLabels[automation.kind]} · {automation.nextRunAt ? `Próximo: ${new Date(automation.nextRunAt).toLocaleString("pt-BR")}` : "Sem próxima execução"}
         </p>
         <p>
           {automation.targetType === "GROUP" ? "Grupo" : automation.targetType === "CONTACT" ? "Contato" : "Sem destino"} · {targetSummary}
         </p>
       </div>
-      <span className={`whatsapp-pill whatsapp-pill--${automation.status.toLowerCase()}`}>{automation.status}</span>
+      <span className={`whatsapp-pill whatsapp-pill--${automation.status.toLowerCase()}`}>{whatsappAutomationStatusLabels[automation.status]}</span>
     </article>
   )
 }
@@ -264,10 +254,10 @@ function LogRow({ log }: { log: WhatsappDispatchLog }) {
       <div>
         <strong>{log.targetType === "GROUP" ? "Grupo" : "Contato"}</strong>
         <p>
-          {log.targetJid} · {logLabels[log.status]} · {log.createdAt ? new Date(log.createdAt).toLocaleString("pt-BR") : "—"}
+          {log.targetJid} · {whatsappDispatchStatusLabels[log.status]} · {log.createdAt ? new Date(log.createdAt).toLocaleString("pt-BR") : "—"}
         </p>
       </div>
-      <span className={`whatsapp-pill whatsapp-pill--${log.status.toLowerCase()}`}>{log.status}</span>
+      <span className={`whatsapp-pill whatsapp-pill--${log.status.toLowerCase()}`}>{whatsappDispatchStatusLabels[log.status]}</span>
     </article>
   )
 }

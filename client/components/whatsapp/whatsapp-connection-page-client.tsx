@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { io, type Socket } from "socket.io-client"
 import { API_BASE_URL, redirectIfUnauthorized } from "../../lib/api"
 import { whatsappFetch, type WhatsappConnection } from "../../lib/whatsapp-api"
+import { whatsappStatusLabels } from "./whatsapp-labels"
 
 export function WhatsappConnectionPageClient() {
   const [connection, setConnection] = useState<WhatsappConnection | null>(null)
@@ -108,7 +109,7 @@ export function WhatsappConnectionPageClient() {
     try {
       const updated = await whatsappFetch<WhatsappConnection>("/whatsapp/connect", { method: "POST" })
       setConnection(updated)
-      setMessage("Pareamento iniciado. Aguarde o QR code aparecer.")
+      setMessage("Pareamento iniciado. Aguarde o código QR aparecer.")
       await loadConnection()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível iniciar o pareamento.")
@@ -163,7 +164,7 @@ export function WhatsappConnectionPageClient() {
           <dl className="whatsapp-meta">
             <div>
               <dt>Status</dt>
-              <dd>{connection?.status ?? "—"}</dd>
+              <dd>{connection ? whatsappStatusLabels[connection.status] : "—"}</dd>
             </div>
             <div>
               <dt>Telefone</dt>
@@ -180,12 +181,12 @@ export function WhatsappConnectionPageClient() {
           </dl>
 
           <div className="whatsapp-qr">
-            <p className="whatsapp-qr__label">QR / token de pareamento</p>
+            <p className="whatsapp-qr__label">Código QR / token de pareamento</p>
             {loading ? (
               <p className="whatsapp-empty">Carregando conexão...</p>
             ) : qrImage ? (
               <div className="whatsapp-qr__image-wrap">
-                <img className="whatsapp-qr__image" src={qrImage} alt="QR Code para parear o WhatsApp Web" />
+                <img className="whatsapp-qr__image" src={qrImage} alt="Código QR para parear o WhatsApp Web" />
                 <details className="whatsapp-qr__details">
                   <summary>Ver token bruto</summary>
                   <code className="whatsapp-qr__code">{connection?.qrCode}</code>
@@ -194,7 +195,7 @@ export function WhatsappConnectionPageClient() {
             ) : connection?.qrCode ? (
               <code className="whatsapp-qr__code">{connection.qrCode}</code>
             ) : (
-              <p className="whatsapp-empty">Nenhum QR disponível no momento.</p>
+              <p className="whatsapp-empty">Nenhum código QR disponível no momento.</p>
             )}
           </div>
         </section>

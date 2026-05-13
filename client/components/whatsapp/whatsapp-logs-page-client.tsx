@@ -4,14 +4,15 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { redirectIfUnauthorized } from "../../lib/api"
 import { whatsappFetch, type WhatsappDispatchLog, type WhatsappDispatchStatus } from "../../lib/whatsapp-api"
+import { formatWhatsappTriggerLabel, whatsappDispatchStatusLabels } from "./whatsapp-labels"
 
 const STATUS_OPTIONS: Array<{ value: WhatsappDispatchStatus | ""; label: string }> = [
   { value: "", label: "Todos" },
-  { value: "PENDING", label: "Pendente" },
-  { value: "RETRYING", label: "Retentando" },
-  { value: "SENT", label: "Enviado" },
-  { value: "FAILED", label: "Falhou" },
-  { value: "SKIPPED", label: "Ignorado" }
+  { value: "PENDING", label: whatsappDispatchStatusLabels.PENDING },
+  { value: "RETRYING", label: whatsappDispatchStatusLabels.RETRYING },
+  { value: "SENT", label: whatsappDispatchStatusLabels.SENT },
+  { value: "FAILED", label: whatsappDispatchStatusLabels.FAILED },
+  { value: "SKIPPED", label: whatsappDispatchStatusLabels.SKIPPED }
 ]
 
 export function WhatsappLogsPageClient() {
@@ -95,12 +96,12 @@ export function WhatsappLogsPageClient() {
                 <div>
                   <strong>{log.targetType === "GROUP" ? "Grupo" : "Contato"}</strong>
                   <p>
-                    {log.targetJid} · {log.status} · {log.createdAt ? new Date(log.createdAt).toLocaleString("pt-BR") : "—"} · {log.triggeredBy}
+                    {log.targetJid} · {whatsappDispatchStatusLabels[log.status]} · {log.createdAt ? new Date(log.createdAt).toLocaleString("pt-BR") : "—"} · {formatWhatsappTriggerLabel(log.triggeredBy)}
                   </p>
                 </div>
 
                 <div className="whatsapp-list-item__actions">
-                  <span className={`whatsapp-pill whatsapp-pill--${log.status.toLowerCase()}`}>{log.status}</span>
+                  <span className={`whatsapp-pill whatsapp-pill--${log.status.toLowerCase()}`}>{whatsappDispatchStatusLabels[log.status]}</span>
                   <span className="whatsapp-muted">Tentativas: {log.attempts}</span>
                 </div>
               </article>
