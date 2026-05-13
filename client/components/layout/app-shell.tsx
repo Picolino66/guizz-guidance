@@ -124,29 +124,14 @@ export function AppShell({ children, quizNavigation, section }: AppShellProps) {
           <div className="app-nav__group">
             <button
               aria-expanded={expanded.rh}
-              className={`app-nav__item app-nav__trigger${section === "rh" ? " is-active" : ""}`}
-              onClick={() => toggleGroup("rh")}
+              className="app-nav__item app-nav__trigger is-disabled"
+              disabled
               type="button"
             >
               <Icon className="h-4 w-4" name="users" />
               <span>RH Recruiter</span>
               <span className="app-nav__chevron">⌄</span>
             </button>
-
-            {expanded.rh ? (
-              <div className="app-nav__children">
-                {rhLinks.map((link) => (
-                  <Link
-                    aria-current={isPathActive(pathname, link.href) ? "page" : undefined}
-                    className={`app-nav__child${isPathActive(pathname, link.href) ? " is-active" : ""}`}
-                    href={link.href as LinkProps<string>["href"]}
-                    key={link.href}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            ) : null}
           </div>
 
           <div className="app-nav__group">
@@ -180,40 +165,14 @@ export function AppShell({ children, quizNavigation, section }: AppShellProps) {
           <div className="app-nav__group">
             <button
               aria-expanded={expanded.quiz}
-              className={`app-nav__item app-nav__trigger${section === "quiz" ? " is-active" : ""}`}
-              onClick={() => toggleGroup("quiz")}
+              className="app-nav__item app-nav__trigger is-disabled"
+              disabled
               type="button"
             >
               <Icon className="h-4 w-4" name="layers" />
               <span>Quizz</span>
               <span className="app-nav__chevron">⌄</span>
             </button>
-
-            {expanded.quiz ? (
-              <div className="app-nav__children">
-                {quizNavigation ? (
-                  quizNavigation.items.map((item) => (
-                    <button
-                      aria-current={quizNavigation.activeView === item.view ? "page" : undefined}
-                      className={`app-nav__child${quizNavigation.activeView === item.view ? " is-active" : ""}`}
-                      key={item.view}
-                      onClick={() => item.onSelect(item.view)}
-                      type="button"
-                    >
-                      {item.label}
-                    </button>
-                  ))
-                ) : (
-                  <Link
-                    aria-current={isPathActive(pathname, "/admin-quiz") ? "page" : undefined}
-                    className={`app-nav__child${isPathActive(pathname, "/admin-quiz") ? " is-active" : ""}`}
-                    href={"/admin-quiz" as LinkProps<string>["href"]}
-                  >
-                    Dashboard
-                  </Link>
-                )}
-              </div>
-            ) : null}
           </div>
         </nav>
 

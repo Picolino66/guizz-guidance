@@ -5903,6 +5903,20 @@ body::after {
   cursor: pointer;
 }
 
+.app-nav__item.is-disabled,
+.app-nav__child.is-disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.app-nav__item.is-disabled:hover,
+.app-nav__child.is-disabled:hover {
+  color: rgba(255, 255, 255, 0.78);
+  background: transparent;
+  transform: none;
+}
+
 .app-nav__chevron {
   margin-left: auto;
   color: rgba(255, 255, 255, 0.54);
