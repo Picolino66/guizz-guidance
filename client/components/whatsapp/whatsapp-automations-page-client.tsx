@@ -727,34 +727,6 @@ export function WhatsappAutomationsPageClient() {
                 </p>
               )}
 
-              {targetType === "CONTACT" && selectedTargets.length > 0 && (
-                <div className="whatsapp-selected-targets">
-                  <p className="whatsapp-selected-targets__summary">
-                    Contatos selecionados: <strong>{selectedTargets.length}</strong>
-                  </p>
-
-                  <div className="whatsapp-selected-targets__list">
-                    {selectedTargets.map((target) => (
-                      <div key={target.jid} className="whatsapp-selected-target">
-                        <div className="whatsapp-selected-target__content">
-                          <strong>{target.label}</strong>
-                          <span>{target.secondaryLabel}</span>
-                        </div>
-
-                        <button
-                          type="button"
-                          className="whatsapp-selected-target__remove"
-                          onClick={() => removeSelectedTarget(target.jid)}
-                          aria-label={`Remover ${target.label}`}
-                        >
-                          Remover
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {targetOptionsError && <p className="whatsapp-form-hint whatsapp-form-hint--error">{targetOptionsError}</p>}
 
               {targetOptionsVisible && targetOptions.length > 0 && (
@@ -783,6 +755,34 @@ export function WhatsappAutomationsPageClient() {
                 targetQuery.trim().length >= TARGET_SEARCH_MIN_LENGTH ? (
                   <p className="whatsapp-form-hint">Nenhum destino encontrado para a busca atual.</p>
                 ) : null
+              )}
+
+              {targetType === "CONTACT" && selectedTargets.length > 0 && (
+                <div className="whatsapp-selected-targets">
+                  <p className="whatsapp-selected-targets__summary">
+                    Contatos selecionados: <strong>{selectedTargets.length}</strong>
+                  </p>
+
+                  <div className="whatsapp-selected-targets__list">
+                    {selectedTargets.map((target) => (
+                      <div key={target.jid} className="whatsapp-selected-target">
+                        <div className="whatsapp-selected-target__content">
+                          <strong>{target.label}</strong>
+                          <span>{target.secondaryLabel}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="whatsapp-selected-target__remove"
+                          onClick={() => removeSelectedTarget(target.jid)}
+                          aria-label={`Remover ${target.label}`}
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {targetType === "CONTACT" && (
