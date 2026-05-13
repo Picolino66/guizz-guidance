@@ -5977,6 +5977,8 @@ body::after {
 }
 
 .app-home-empty {
+  display: grid;
+  place-items: center;
   min-height: calc(100vh - clamp(2rem, 6vw, 4rem));
   border: 1px dashed rgba(35, 35, 35, 0.12);
   border-radius: var(--radius-md);
@@ -5985,6 +5987,13 @@ body::after {
     linear-gradient(transparent 0 31px, rgba(35, 35, 35, 0.04) 31px 32px),
     rgba(255, 255, 255, 0.38);
   background-size: 32px 32px;
+}
+
+.app-home-empty p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  font-weight: 700;
 }
 
 .app-content .admin-app,

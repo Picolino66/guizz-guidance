@@ -28,7 +28,7 @@ Frontend Next.js App Router responsavel pelas telas publicas do quiz e pelas are
 - Home, Contato, Quizz/Admin Quiz, RH Recruiter e WhatsApp compartilham o mesmo sidebar.
 - O sidebar usa grupos expansíveis por modulo.
 - Os grupos `RH Recruiter` e `Quizz` estao visiveis no sidebar, mas temporariamente desativados para clique/expansao.
-- A Home (`/` e `/hub`) mantém apenas o shell e não exibe conteúdo central por enquanto.
+- A Home (`/` e `/hub`) mantém o shell interno e exibe a mensagem `Estamos em construção` no conteúdo central.
 - Login, espera, quiz público e ranking continuam fora do shell interno.
 - Home, Contato, Admin Quiz, RH e WhatsApp validam a sessao interna em `/auth/session` antes de renderizar.
 - `middleware.ts` nao e usado para essa protecao porque o token interno fica em `localStorage`, inacessivel no middleware server-side do Next.js.

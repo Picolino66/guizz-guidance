@@ -10,7 +10,9 @@ export function HubPageClient() {
 
   return (
     <AppShell section="home">
-      <div className="app-home-empty" aria-label="Home sem conteúdo central" />
+      <div className="app-home-empty" aria-label="Home em construção">
+        <p>Estamos em construção</p>
+      </div>
     </AppShell>
   )
 }
