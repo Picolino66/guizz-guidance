@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  OnModuleDestroy,
   OnModuleInit
 } from "@nestjs/common"
 import { Cron, CronExpression } from "@nestjs/schedule"
@@ -167,7 +168,7 @@ export interface WhatsappGroupView {
 export interface WhatsappDirectorySyncView extends WhatsappDirectorySyncResult {}
 
 @Injectable()
-export class WhatsappService implements OnModuleInit {
+export class WhatsappService implements OnModuleInit, OnModuleDestroy {
   private schedulerRunning = false
 
   constructor(
@@ -206,6 +207,10 @@ export class WhatsappService implements OnModuleInit {
       })
       this.publishConnection(updated)
     }
+  }
+
+  async onModuleDestroy() {
+    await this.adapter.closeGracefully()
   }
 
   async getOverview() {

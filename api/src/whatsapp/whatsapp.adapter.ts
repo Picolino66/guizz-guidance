@@ -143,6 +143,22 @@ export class WhatsappAdapter {
     }
   }
 
+  async closeGracefully() {
+    this.manualDisconnect = true
+    this.clearReconnectTimer()
+
+    const client = this.client
+    this.client = null
+    this.ready = false
+    this.connecting = false
+    this.loading = null
+    this.contactCache.clear()
+
+    if (client) {
+      this.closeSocket(client)
+    }
+  }
+
   async sendMessage(jid: string, payload: WhatsappOutboundMessage) {
     if (!this.client || !this.ready) {
       throw new Error("Cliente WhatsApp indisponível.")
@@ -378,10 +394,15 @@ export class WhatsappAdapter {
       creds = initAuthCreds()
     }
 
+    let saveQueue = Promise.resolve()
+
     const saveState = async () => {
-      const serialized = JSON.parse(JSON.stringify({ creds, keys }, BufferJSON.replacer))
-      this.session = serialized
-      await events.onSession(serialized)
+      saveQueue = saveQueue.then(async () => {
+        const serialized = JSON.parse(JSON.stringify({ creds, keys }, BufferJSON.replacer))
+        this.session = serialized
+        await events.onSession(serialized)
+      })
+      await saveQueue
     }
 
     return {
