@@ -728,18 +728,30 @@ export function WhatsappAutomationsPageClient() {
               )}
 
               {targetType === "CONTACT" && selectedTargets.length > 0 && (
-                <div className="whatsapp-form-hint">
-                  Contatos selecionados: {selectedTargets.length}
-                  {selectedTargets.map((target) => (
-                    <button
-                      key={target.jid}
-                      type="button"
-                      className="whatsapp-button whatsapp-button--ghost"
-                      onClick={() => removeSelectedTarget(target.jid)}
-                    >
-                      {target.label} · remover
-                    </button>
-                  ))}
+                <div className="whatsapp-selected-targets">
+                  <p className="whatsapp-selected-targets__summary">
+                    Contatos selecionados: <strong>{selectedTargets.length}</strong>
+                  </p>
+
+                  <div className="whatsapp-selected-targets__list">
+                    {selectedTargets.map((target) => (
+                      <div key={target.jid} className="whatsapp-selected-target">
+                        <div className="whatsapp-selected-target__content">
+                          <strong>{target.label}</strong>
+                          <span>{target.secondaryLabel}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="whatsapp-selected-target__remove"
+                          onClick={() => removeSelectedTarget(target.jid)}
+                          aria-label={`Remover ${target.label}`}
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

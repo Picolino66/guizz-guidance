@@ -46,6 +46,7 @@ Area administrativa para operar a conexao WhatsApp, automacoes, logs e status da
 - A busca de grupos usa um catalogo persistido no banco e carrega autocomplete automaticamente apenas quando o usuario digita pelo menos 3 caracteres.
 - A busca de contatos usa a agenda interna salva em `Contact`, carregando autocomplete automaticamente apenas quando o usuario digita pelo menos 3 caracteres.
 - Quando o destino da automacao e `Contato`, a tela permite selecionar varios contatos e a automacao envia uma mensagem separada para cada pessoa.
+- Quando o destino da automacao e `Contato`, os contatos selecionados aparecem em uma lista minimalista abaixo do campo, com acao discreta de remocao por item.
 - Quando o destino da automacao e `Contato`, o placeholder `[nome]` no corpo da mensagem e substituido pelo nome salvo na agenda de cada contato selecionado.
 - A tela de automacoes manteve sincronizacao manual apenas para grupos, para atualizar o catalogo persistido vindo do WhatsApp Web.
 - O cadastro de automacao converte foto JPEG/PNG/WebP para Base64 no browser, mostra preview e envia `imageBase64`, `imageMimeType` e `imageFileName`.
