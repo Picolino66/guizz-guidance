@@ -40,6 +40,7 @@ const MAX_WHATSAPP_IMAGE_BYTES = 5 * 1024 * 1024
 const MAX_MENTION_SUGGESTIONS = 8
 const TARGET_SEARCH_DEBOUNCE_MS = 250
 const MENTION_SEARCH_DEBOUNCE_MS = 150
+const TARGET_SEARCH_MIN_LENGTH = 3
 
 type WhatsappTargetOption = {
   jid: string
@@ -258,10 +259,18 @@ export function WhatsappAutomationsPageClient() {
 
   async function loadTargetOptions(search: string) {
     const requestId = ++targetSearchRequestIdRef.current
+    const query = search.trim()
+
+    if (query.length < TARGET_SEARCH_MIN_LENGTH) {
+      setTargetOptions([])
+      setTargetOptionsLoading(false)
+      setTargetOptionsError(null)
+      return
+    }
+
     setTargetOptionsLoading(true)
     setTargetOptionsError(null)
 
-    const query = search.trim()
     const params = new URLSearchParams()
     if (query) {
       params.set("search", query)
@@ -693,7 +702,6 @@ export function WhatsappAutomationsPageClient() {
                   onChange={(event) => handleTargetQueryChange(event.target.value)}
                   onFocus={() => {
                     setTargetOptionsVisible(true)
-                    void loadTargetOptions(targetQuery)
                   }}
                   placeholder={targetType === "GROUP" ? "Nome do grupo ou JID" : "Nome do contato ou telefone"}
                 />
@@ -755,8 +763,14 @@ export function WhatsappAutomationsPageClient() {
                 </ul>
               )}
 
+              {targetOptionsVisible && targetQuery.trim().length > 0 && targetQuery.trim().length < TARGET_SEARCH_MIN_LENGTH && !targetOptionsError && (
+                <p className="whatsapp-form-hint">Digite ao menos 3 caracteres para buscar.</p>
+              )}
+
               {targetOptionsVisible && !targetOptionsLoading && targetOptions.length === 0 && !targetOptionsError && (
-                <p className="whatsapp-form-hint">Nenhum destino encontrado para a busca atual.</p>
+                targetQuery.trim().length >= TARGET_SEARCH_MIN_LENGTH ? (
+                  <p className="whatsapp-form-hint">Nenhum destino encontrado para a busca atual.</p>
+                ) : null
               )}
 
               {targetType === "CONTACT" && (

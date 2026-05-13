@@ -43,8 +43,8 @@ Area administrativa para operar a conexao WhatsApp, automacoes, logs e status da
 - A pagina de conexao nao edita mais grupo padrao; ela apenas opera a sessao WhatsApp.
 - A area de automacoes permite criar, pausar, disparar e excluir regras.
 - Cada automacao exige um destino explicito, com selecao entre grupo e contato.
-- A busca de grupos usa um catalogo persistido no banco e carrega autocomplete automaticamente conforme o usuario digita.
-- A busca de contatos usa a agenda interna salva em `Contact`, carregando autocomplete automaticamente conforme o usuario digita.
+- A busca de grupos usa um catalogo persistido no banco e carrega autocomplete automaticamente apenas quando o usuario digita pelo menos 3 caracteres.
+- A busca de contatos usa a agenda interna salva em `Contact`, carregando autocomplete automaticamente apenas quando o usuario digita pelo menos 3 caracteres.
 - Quando o destino da automacao e `Contato`, a tela permite selecionar varios contatos e a automacao envia uma mensagem separada para cada pessoa.
 - Quando o destino da automacao e `Contato`, o placeholder `[nome]` no corpo da mensagem e substituido pelo nome salvo na agenda de cada contato selecionado.
 - A tela de automacoes manteve sincronizacao manual apenas para grupos, para atualizar o catalogo persistido vindo do WhatsApp Web.
