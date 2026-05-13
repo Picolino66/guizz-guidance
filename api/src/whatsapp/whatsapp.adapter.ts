@@ -13,6 +13,7 @@ import makeWASocket, {
   isJidBroadcast,
   proto
 } from "baileys"
+import type { Contact, GroupParticipant } from "baileys"
 import P from "pino"
 
 interface ConnectionEvents {
@@ -27,6 +28,7 @@ interface ConnectionEvents {
 const MAX_RECONNECT_ATTEMPTS = 5
 const MAX_QR_RETRIES = 5
 const RECONNECT_DELAY_MS = 2000
+const WHATSAPP_CONTACT_JID_PATTERN = /^(?:\d+@s\.whatsapp\.net|[\w.-]+@lid)$/
 
 const KEY_MAP: { [T in keyof SignalDataTypeMap]: string } = {
   "pre-key": "preKeys",
@@ -41,6 +43,42 @@ type WhatsappSession = WASocket & {
   id?: string
 }
 
+export interface WhatsappOutboundMessage {
+  text: string
+  image?: {
+    buffer: Buffer
+    mimeType: string
+    fileName?: string | null
+  } | null
+  mentions?: string[]
+}
+
+export interface WhatsappGroupParticipant {
+  jid: string
+  name: string
+  phoneNumber: string
+  isAdmin: boolean
+}
+
+export interface WhatsappContactEntry {
+  jid: string
+  name: string
+  phoneNumber: string
+}
+
+export interface WhatsappDirectorySyncResult {
+  contactCount: number
+  groupCount: number
+}
+
+const WHATSAPP_SYNC_COLLECTIONS = [
+  "critical_block",
+  "critical_unblock_low",
+  "regular",
+  "regular_high",
+  "regular_low"
+] as const
+
 @Injectable()
 export class WhatsappAdapter {
   private client: WhatsappSession | null = null
@@ -53,6 +91,7 @@ export class WhatsappAdapter {
   private reconnectTimer: NodeJS.Timeout | null = null
   private events: ConnectionEvents | null = null
   private session: unknown | null = null
+  private readonly contactCache = new Map<string, Contact>()
   private readonly logger = P({ level: "error" })
 
   async connect(session: unknown | null, events: ConnectionEvents) {
@@ -94,6 +133,7 @@ export class WhatsappAdapter {
     this.reconnectAttempts = 0
     this.qrRetries = 0
     this.session = null
+    this.contactCache.clear()
 
     if (client) {
       await client.logout().catch((err: unknown) => {
@@ -103,12 +143,27 @@ export class WhatsappAdapter {
     }
   }
 
-  async sendMessage(jid: string, message: string) {
+  async sendMessage(jid: string, payload: WhatsappOutboundMessage) {
     if (!this.client || !this.ready) {
       throw new Error("Cliente WhatsApp indisponível.")
     }
 
-    return this.client.sendMessage(jid, { text: message })
+    const mentions = payload.mentions?.length ? payload.mentions : undefined
+
+    if (payload.image) {
+      return this.client.sendMessage(jid, {
+        image: payload.image.buffer,
+        caption: payload.text,
+        mimetype: payload.image.mimeType,
+        fileName: payload.image.fileName ?? undefined,
+        mentions
+      })
+    }
+
+    return this.client.sendMessage(jid, {
+      text: payload.text,
+      mentions
+    })
   }
 
   async getGroups(): Promise<{ jid: string; name: string }[]> {
@@ -125,8 +180,80 @@ export class WhatsappAdapter {
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
   }
 
+  async getGroupParticipants(jid: string): Promise<WhatsappGroupParticipant[]> {
+    if (!this.client || !this.ready) {
+      throw new Error("Cliente WhatsApp indisponível.")
+    }
+
+    const metadata = await this.client.groupMetadata(jid)
+
+    return metadata.participants
+      .map((participant) => this.toGroupParticipant(participant))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+  }
+
+  listContacts(): WhatsappContactEntry[] {
+    const contacts = new Map<string, WhatsappContactEntry>()
+
+    for (const contact of this.contactCache.values()) {
+      const entry = this.toContactEntry(contact)
+
+      if (!entry) {
+        continue
+      }
+
+      contacts.set(entry.jid, entry)
+    }
+
+    return [...contacts.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+  }
+
+  async syncDirectory(): Promise<WhatsappDirectorySyncResult> {
+    if (!this.client || !this.ready) {
+      throw new Error("Cliente WhatsApp indisponível.")
+    }
+
+    await this.client.resyncAppState(WHATSAPP_SYNC_COLLECTIONS, false)
+
+    return {
+      contactCount: this.listContacts().length,
+      groupCount: (await this.getGroups()).length
+    }
+  }
+
   isReady() {
     return Boolean(this.client) && this.ready
+  }
+
+  private toGroupParticipant(participant: GroupParticipant): WhatsappGroupParticipant {
+    const jid = participant.jid ?? participant.id
+    const phoneNumber = jid.split("@")[0]
+    const cachedContact = this.findCachedContact(participant)
+    const name = cachedContact?.name ?? participant.name ?? participant.notify ?? participant.verifiedName ?? phoneNumber
+
+    return {
+      jid,
+      name,
+      phoneNumber,
+      isAdmin: participant.admin === "admin" || participant.admin === "superadmin" || Boolean(participant.isAdmin || participant.isSuperAdmin)
+    }
+  }
+
+  private toContactEntry(contact: Partial<Contact>): WhatsappContactEntry | null {
+    const jid = this.getPrimaryContactJid(contact)
+
+    if (!jid) {
+      return null
+    }
+
+    const phoneNumber = jid.split("@")[0]
+    const name = contact.name ?? contact.notify ?? contact.verifiedName ?? phoneNumber
+
+    return {
+      jid,
+      name,
+      phoneNumber
+    }
   }
 
   private async createClient() {
@@ -167,6 +294,14 @@ export class WhatsappAdapter {
         void saveState()
       })
 
+      client.ev.on("contacts.upsert", (contacts) => {
+        this.upsertContacts(contacts)
+      })
+
+      client.ev.on("contacts.update", (contacts) => {
+        this.updateContacts(contacts)
+      })
+
       return client
     } catch (error) {
       const reason = this.getErrorMessage(error)
@@ -177,6 +312,52 @@ export class WhatsappAdapter {
       await this.events?.onDisconnected(`Erro ao iniciar: ${reason}`)
       return null
     }
+  }
+
+  private upsertContacts(contacts: Contact[]) {
+    for (const contact of contacts) {
+      this.storeContact(contact)
+    }
+  }
+
+  private updateContacts(contacts: Partial<Contact>[]) {
+    for (const contact of contacts) {
+      this.storeContact(contact)
+    }
+  }
+
+  private storeContact(contact: Partial<Contact>) {
+    const keys = this.getContactKeys(contact)
+
+    if (keys.length === 0) {
+      return
+    }
+
+    const existing = keys.map((key) => this.contactCache.get(key)).find(Boolean)
+    const merged = { ...existing, ...contact } as Contact
+
+    for (const key of this.getContactKeys(merged)) {
+      this.contactCache.set(key, merged)
+    }
+  }
+
+  private findCachedContact(participant: GroupParticipant) {
+    return this.getContactKeys(participant)
+      .map((key) => this.contactCache.get(key))
+      .find((contact) => contact?.name)
+  }
+
+  private getPrimaryContactJid(contact: Partial<Contact>) {
+    return [contact.jid, contact.id, contact.lid]
+      .map((value) => value?.trim())
+      .filter((value): value is string => Boolean(value))
+      .find((value) => WHATSAPP_CONTACT_JID_PATTERN.test(value))
+  }
+
+  private getContactKeys(contact: Partial<Contact>) {
+    return [contact.id, contact.jid, contact.lid]
+      .map((key) => key?.trim())
+      .filter((key): key is string => Boolean(key))
   }
 
   private async createAuthState(

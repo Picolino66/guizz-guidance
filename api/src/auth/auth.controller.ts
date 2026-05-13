@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { AdminAuthGuard } from "../common/guards/admin-auth.guard";
 import { AuthUser } from "../common/types/auth-user.type";
@@ -19,6 +19,12 @@ export class AuthController {
   @Post("login-admin")
   loginAdmin(@Body() dto: LoginAdminDto) {
     return this.authService.loginAdmin(dto);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Get("session")
+  getSession(@CurrentUser() user: AuthUser) {
+    return this.authService.getSession(user);
   }
 
   @UseGuards(AdminAuthGuard)

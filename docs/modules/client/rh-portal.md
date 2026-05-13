@@ -16,6 +16,7 @@ Area de recrutamento para usuarios RH e TECH com navegacao condicional por perfi
 - `client/components/rh/rh-layout.tsx`
 - `client/components/layout/app-shell.tsx`
 - `client/components/rh/*.tsx`
+- `client/lib/internal-session.ts`
 - `client/lib/rh-api.ts`
 - `client/lib/rh-session.ts`
 
@@ -36,10 +37,11 @@ Area de recrutamento para usuarios RH e TECH com navegacao condicional por perfi
 - Fluxo de entrevista com criacao, atribuicao, confirmacao e conclusao
 
 ## Dependencias
-- Token RH
+- Token interno unificado salvo como token admin
 - `RhLayout` renderiza o `AppShell` compartilhado
 - login unificado em `/login?role=rh`
 - API de recrutamento em `/rh/*`
+- Validacao de sessao interna em `GET /auth/session`
 
 ## Regras de negocio
 - O menu muda conforme o papel do usuario.
@@ -47,7 +49,7 @@ Area de recrutamento para usuarios RH e TECH com navegacao condicional por perfi
 - RH ve painel, candidatos, vagas e templates.
 - TECH ve apenas as telas de entrevista atribuida.
 - O login redireciona para o painel correspondente ao papel do usuario.
-- O logout e os guards retornam para `/login?role=rh` em vez de usar `/rh/login`.
+- O layout RH redireciona para `/login` quando a sessao interna esta ausente, expirada ou invalida.
 
 ## Fluxo resumido
 1. O usuario RH/TECH autentica.
@@ -56,6 +58,6 @@ Area de recrutamento para usuarios RH e TECH com navegacao condicional por perfi
 4. TECH acompanha suas entrevistas e responde aos fluxos de slot e formulario.
 
 ## Possiveis erros
-- Sessao ausente ou invalida
+- Sessao ausente, expirada ou invalida
 - Falha de autorizacao por papel
 - Erros de carregamento de entrevistas, candidatos, vagas ou templates

@@ -1,25 +1,14 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import {
-  getRhToken,
-  RH_LOGIN_PATH
-} from "../../lib/rh-session"
+import { useRequireInternalSession } from "../../lib/internal-session"
 import { AppShell } from "../layout/app-shell"
 
 interface Props { children: React.ReactNode }
 
 export function RhLayout({ children }: Props) {
-  const router = useRouter()
-  const [mounted, setMounted] = useState(false)
+  const session = useRequireInternalSession()
 
-  useEffect(() => {
-    if (!getRhToken()) { router.replace(RH_LOGIN_PATH); return }
-    setMounted(true)
-  }, [router])
-
-  if (!mounted) return null
+  if (session.isChecking || !session.token) return null
 
   return (
     <AppShell section="rh">

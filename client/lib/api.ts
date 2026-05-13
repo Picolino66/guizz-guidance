@@ -1,3 +1,5 @@
+import { clearAdminToken } from "./session";
+
 export type QuizStatus = "DRAFT" | "SCHEDULED" | "RUNNING" | "FINISHED";
 
 export interface QuizSummary {
@@ -77,6 +79,7 @@ export function isUnauthorizedError(error: unknown) {
 
 export function redirectIfUnauthorized(err: unknown, onUnauthorized: () => void): boolean {
   if (isUnauthorizedError(err)) {
+    clearAdminToken()
     onUnauthorized()
     return true
   }

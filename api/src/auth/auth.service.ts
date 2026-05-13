@@ -118,6 +118,25 @@ export class AuthService {
     };
   }
 
+  async getSession(user: AuthUser) {
+    const systemUser = await this.prisma.systemUser.findUnique({
+      where: { id: user.sub },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        role: true
+      }
+    });
+
+    if (!systemUser) {
+      throw new UnauthorizedException("Sessão expirada. Faça login novamente.");
+    }
+
+    return systemUser;
+  }
+
   private getNameFromEmail(email: string) {
     return email.split("@")[0].replace(/[._-]+/g, " ");
   }

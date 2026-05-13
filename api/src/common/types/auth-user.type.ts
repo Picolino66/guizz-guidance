@@ -1,4 +1,4 @@
-export type AuthRole = "participant" | "admin";
+export type AuthRole = "participant" | "ADMIN" | "USER";
 
 export interface AuthUser {
   sub: string;

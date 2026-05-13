@@ -11,23 +11,26 @@ Fluxos de login e troca de senha para participante e admin.
 ## Entrada
 - `POST /auth/login-participant`
 - `POST /auth/login-admin`
+- `GET /auth/session`
 - `POST /auth/change-admin-password`
 
 ## Saida
 - Token JWT com informacoes do usuario autenticado
 - Dados publicos do participante ou admin
+- Dados publicos do usuario interno autenticado em `GET /auth/session`
 - Mensagem de confirmacao na troca de senha
 
 ## Dependencias
 - `PrismaService`
 - `JwtService`
-- `AdminAuthGuard` para alteracao de senha
+- `AdminAuthGuard` para validacao de sessao interna e alteracao de senha
 - `bcrypt` para validar e atualizar senha de admin
 
 ## Regras de negocio
 - O participante so autentica se o e-mail estiver liberado em `AllowedEmail`.
 - O login do participante cria ou reaproveita um `User` por e-mail.
 - O login do admin aceita `username` ou `email`.
+- A sessao interna e validada por token JWT e por existencia atual do `SystemUser`.
 - A nova senha do admin precisa ser diferente da senha atual.
 
 ## Fluxo resumido
@@ -35,10 +38,10 @@ Fluxos de login e troca de senha para participante e admin.
 2. O backend valida a lista liberada.
 3. O admin envia login e senha.
 4. O backend valida a senha e emite JWT.
-5. O admin autenticado pode trocar a propria senha.
+5. O client valida a sessao interna em `GET /auth/session` antes de renderizar telas internas.
+6. O admin autenticado pode trocar a propria senha.
 
 ## Possiveis erros
-- `401 Unauthorized` quando o e-mail nao esta autorizado ou as credenciais sao invalidas
+- `401 Unauthorized` quando o e-mail nao esta autorizado, as credenciais sao invalidas, o token e invalido ou o `SystemUser` nao existe mais
 - `400 Bad Request` quando a senha atual esta incorreta ou a nova senha repete a anterior
 - `404 Not Found` se o admin autenticado nao existir mais
-

@@ -1,23 +1,12 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { getAdminToken } from "../../lib/session"
+import { useRequireInternalSession } from "../../lib/internal-session"
 import { AppShell } from "../layout/app-shell"
 
 export function HubPageClient() {
-  const router = useRouter()
-  const [mounted, setMounted] = useState(false)
+  const session = useRequireInternalSession()
 
-  useEffect(() => {
-    setMounted(true)
-
-    if (!getAdminToken()) {
-      router.replace("/login")
-    }
-  }, [router])
-
-  if (!mounted) return null
+  if (session.isChecking || !session.token) return null
 
   return (
     <AppShell section="home">

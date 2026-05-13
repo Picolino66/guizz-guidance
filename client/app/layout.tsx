@@ -17,7 +17,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Guidance Quiz Platform",
+  title: "Guidance Platform",
   description: "Plataforma de quiz corporativo com experiência premium, operação centralizada e ranking em tempo real."
 };
 

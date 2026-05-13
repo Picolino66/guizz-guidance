@@ -108,7 +108,7 @@ export function RhJobsPageClient() {
                     <td>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                         {j.stackTags.map((t) => (
-                          <span key={t} className="rh-badge" style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 11 }}>{t}</span>
+                          <span key={t} className="rh-badge rh-badge--info" style={{ fontSize: 11 }}>{t}</span>
                         ))}
                       </div>
                     </td>

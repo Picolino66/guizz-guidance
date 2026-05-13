@@ -8,12 +8,4 @@ export class UpdateWhatsappConnectionDto {
   @IsOptional()
   @IsString()
   phoneNumber?: string
-
-  @IsOptional()
-  @IsString()
-  groupName?: string
-
-  @IsOptional()
-  @IsString()
-  groupJid?: string
 }

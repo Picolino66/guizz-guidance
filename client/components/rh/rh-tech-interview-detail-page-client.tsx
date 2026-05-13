@@ -39,7 +39,7 @@ function DynamicForm({ questions, onSubmit }: { questions: FormQuestion[]; onSub
         <div key={q.id} className="rh-form-group">
           <label className="rh-label">
             {q.label}
-            {q.required && <span style={{ color: "#dc2626" }}> *</span>}
+            {q.required && <span style={{ color: "var(--color-error)" }}> *</span>}
           </label>
 
           {q.type === "YES_NO" && (
@@ -155,9 +155,8 @@ export function RhTechInterviewDetailPageClient({ id }: Props) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-          {/* Candidato */}
           <div className="rh-card">
-            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Candidato</h3>
+            <h3 className="rh-card__title">Candidato</h3>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
               {[
                 ["Senioridade", iv.candidate.pretensaoSenioridade || "—"],
@@ -166,22 +165,21 @@ export function RhTechInterviewDetailPageClient({ id }: Props) {
                 ["Ferramentas", iv.candidate.ferramentas],
               ].map(([l, v]) => (
                 <div key={l}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{l}</div>
-                  <div style={{ fontSize: 14, color: "#334155", marginTop: 2 }}>{v}</div>
+                  <div className="rh-field__label">{l}</div>
+                  <div className="rh-field__value">{v}</div>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", marginBottom: 6 }}>Resumo profissional</div>
-            <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.6 }}>{iv.candidate.resumoProfissional}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", marginTop: 16, marginBottom: 6 }}>Motivação para mudança</div>
-            <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.6 }}>{iv.candidate.motivacaoMudanca}</div>
+            <div className="rh-field__label" style={{ marginBottom: 6 }}>Resumo profissional</div>
+            <div className="rh-field__body">{iv.candidate.resumoProfissional}</div>
+            <div className="rh-field__label" style={{ marginTop: 16, marginBottom: 6 }}>Motivação para mudança</div>
+            <div className="rh-field__body">{iv.candidate.motivacaoMudanca}</div>
           </div>
 
-          {/* Confirmação de slot */}
           {iv.status === "WAITING_TECH_CONFIRMATION" && proposedSlots.length > 0 && (
             <div className="rh-card">
-              <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Confirmar Data</h3>
-              <p style={{ fontSize: 14, color: "#64748b", marginBottom: 12 }}>Escolha uma das datas propostas pelo RH ou sugira novas datas.</p>
+              <h3 className="rh-card__title">Confirmar Data</h3>
+              <p className="rh-field__muted" style={{ marginBottom: 12 }}>Escolha uma das datas propostas pelo RH ou sugira novas datas.</p>
 
               <div className="rh-slot-list" style={{ marginBottom: 16 }}>
                 {proposedSlots.map((s) => (
@@ -194,8 +192,8 @@ export function RhTechInterviewDetailPageClient({ id }: Props) {
                 ))}
               </div>
 
-              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 8 }}>Ou sugira novas datas:</div>
+              <div className="rh-inset-section">
+                <div className="rh-inset-section__label">Ou sugira novas datas:</div>
                 {counterSlots.map((s, i) => (
                   <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                     <input className="rh-input" type="datetime-local" value={s} onChange={(e) => {
@@ -214,11 +212,10 @@ export function RhTechInterviewDetailPageClient({ id }: Props) {
             </div>
           )}
 
-          {/* Formulário dinâmico */}
           {canFillForm && (
             <div className="rh-card">
-              <h3 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 700 }}>Formulário de Avaliação</h3>
-              <p style={{ fontSize: 13, color: "#64748b", marginBottom: 20 }}>
+              <h3 className="rh-card__title" style={{ marginBottom: 4 }}>Formulário de Avaliação</h3>
+              <p className="rh-field__muted" style={{ marginBottom: 20 }}>
                 {iv.formTemplate!.name} · v{iv.formTemplate!.version}
               </p>
               <DynamicForm questions={iv.formTemplate!.questions} onSubmit={submitForm} />
@@ -226,37 +223,36 @@ export function RhTechInterviewDetailPageClient({ id }: Props) {
           )}
 
           {formSuccess && (
-            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: 20, color: "#15803d", fontWeight: 600 }}>
+            <div className="rh-form-success-msg">
               Formulário submetido com sucesso!
             </div>
           )}
 
           {iv.submission && (
             <div className="rh-card">
-              <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700 }}>Formulário submetido</h3>
-              <div style={{ fontSize: 14, color: "#64748b" }}>Você já submeteu o formulário para esta entrevista.</div>
+              <h3 className="rh-card__title">Formulário submetido</h3>
+              <div className="rh-field__muted">Você já submeteu o formulário para esta entrevista.</div>
             </div>
           )}
         </div>
 
-        {/* Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="rh-card">
-            <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700 }}>Vaga</h3>
+            <h3 className="rh-card__title rh-card__title--sm">Vaga</h3>
             <div style={{ fontWeight: 600 }}>{iv.jobPosition.titulo}</div>
-            <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{iv.jobPosition.nivel}</div>
-            {iv.jobPosition.descricao && <div style={{ fontSize: 13, color: "#475569", marginTop: 10, lineHeight: 1.5 }}>{iv.jobPosition.descricao}</div>}
+            <div className="rh-field__muted" style={{ marginTop: 2 }}>{iv.jobPosition.nivel}</div>
+            {iv.jobPosition.descricao && <div className="rh-field__muted" style={{ marginTop: 10 }}>{iv.jobPosition.descricao}</div>}
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 10 }}>
               {iv.jobPosition.stackTags.map((t) => (
-                <span key={t} className="rh-badge" style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 11 }}>{t}</span>
+                <span key={t} className="rh-badge rh-badge--info" style={{ fontSize: 11 }}>{t}</span>
               ))}
             </div>
           </div>
 
           {iv.confirmedSlot && (
-            <div className="rh-card" style={{ background: "#f0fdf4", borderColor: "#bbf7d0" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#15803d", marginBottom: 4 }}>DATA CONFIRMADA</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#166534" }}>{formatDT(iv.confirmedSlot.startAt)}</div>
+            <div className="rh-card rh-card--success">
+              <div className="rh-slot__confirmed-label">DATA CONFIRMADA</div>
+              <div className="rh-slot__confirmed-value">{formatDT(iv.confirmedSlot.startAt)}</div>
             </div>
           )}
         </div>

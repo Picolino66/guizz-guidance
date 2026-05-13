@@ -31,6 +31,18 @@ model AllowedEmail {
   quizAllowedEmails QuizAllowedEmail[]
 }
 
+model Contact {
+  id          String   @id @default(cuid())
+  name        String?
+  email       String?  @unique
+  phoneNumber String?  @unique
+  searchText  String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([searchText])
+}
+
 model Quiz {
   id                String             @id @default(uuid())
   title             String
@@ -333,6 +345,11 @@ enum WhatsappAutomationStatus {
   ARCHIVED
 }
 
+enum WhatsappAutomationTargetType {
+  GROUP
+  CONTACT
+}
+
 enum WhatsappDispatchStatus {
   PENDING
   RETRYING
@@ -346,8 +363,6 @@ model WhatsappConnection {
   key                 String                @unique @default("primary")
   label               String
   phoneNumber         String?
-  groupName           String?
-  groupJid            String?
   status              WhatsappSessionStatus @default(DISCONNECTED)
   qrCode              String?
   session             Json?
@@ -359,6 +374,24 @@ model WhatsappConnection {
   updatedAt           DateTime              @updatedAt
   automations         WhatsappAutomation[]
   dispatchLogs        WhatsappDispatchLog[]
+  groups              WhatsappGroup[]
+}
+
+model WhatsappGroup {
+  id           String             @id @default(cuid())
+  connectionId String
+  jid          String
+  name         String
+  searchText   String             @default("")
+  isAvailable  Boolean            @default(true)
+  lastSyncedAt DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  connection   WhatsappConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, jid])
+  @@index([connectionId, isAvailable, name])
+  @@index([searchText])
 }
 
 model WhatsappAutomation {
@@ -368,7 +401,12 @@ model WhatsappAutomation {
   message              String
   kind                 WhatsappAutomationKind
   status               WhatsappAutomationStatus @default(ACTIVE)
-  targetGroupJid       String?
+  targetType           WhatsappAutomationTargetType?
+  targetJid            String?
+  imageBase64          String?
+  imageMimeType        String?
+  imageFileName        String?
+  mentionJids          String[]                 @default([])
   scheduledFor         DateTime?
   timeOfDay            String?
   daysOfWeek           Int[]                   @default([])
@@ -393,7 +431,8 @@ model WhatsappDispatchLog {
   automationId       String?
   connectionId       String
   dispatchKey        String                @unique
-  targetGroupJid     String
+  targetType         WhatsappAutomationTargetType
+  targetJid          String
   message            String
   status             WhatsappDispatchStatus
   attempts           Int                   @default(0)

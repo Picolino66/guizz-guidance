@@ -100,15 +100,15 @@ export function RhDashboardPageClient() {
                   <tr key={i.id}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{i.candidate.name}</div>
-                      <div style={{ fontSize: 12, color: "#94a3b8" }}>{i.candidate.pretensaoSenioridade || "—"}</div>
+                      <div className="rh-field__muted">{i.candidate.pretensaoSenioridade || "—"}</div>
                     </td>
                     <td>
                       <div>{i.jobPosition.titulo}</div>
-                      <div style={{ fontSize: 12, color: "#94a3b8" }}>{i.jobPosition.nivel}</div>
+                      <div className="rh-field__muted">{i.jobPosition.nivel}</div>
                     </td>
                     <td>
                       {i.assignees.length === 0
-                        ? <span style={{ color: "#94a3b8", fontSize: 13 }}>—</span>
+                        ? <span className="rh-field__muted">—</span>
                         : i.assignees.map((a) => (
                           <div key={a.user.id} style={{ fontSize: 13 }}>{a.user.name}</div>
                         ))}
@@ -118,10 +118,10 @@ export function RhDashboardPageClient() {
                     </td>
                     <td>
                       {i.confirmedSlot
-                        ? <span style={{ fontWeight: 600, color: "#15803d" }}>{formatDate(i.confirmedSlot.startAt)}</span>
-                        : <span style={{ color: "#94a3b8" }}>—</span>}
+                        ? <span className="rh-slot__confirmed-label" style={{ fontSize: "inherit", marginBottom: 0 }}>{formatDate(i.confirmedSlot.startAt)}</span>
+                        : <span className="rh-field__muted">—</span>}
                     </td>
-                    <td style={{ color: "#94a3b8", fontSize: 13 }}>{formatDate(i.createdAt)}</td>
+                    <td className="rh-field__muted">{formatDate(i.createdAt)}</td>
                     <td>
                       <Link href={`/rh/interviews/${i.id}`} className="rh-btn rh-btn--ghost rh-btn--sm">Ver →</Link>
                     </td>

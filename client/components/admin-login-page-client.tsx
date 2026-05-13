@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Icon } from "./icons";
 import { apiFetch } from "../lib/api";
-import { getAdminToken, setAdminToken, setSystemUser, SystemUser } from "../lib/session";
+import { validateInternalSession } from "../lib/internal-session";
+import { setAdminToken, setSystemUser, SystemUser } from "../lib/session";
 import { getRhDashboardPath } from "../lib/rh-session";
 
 export function AdminLoginPageClient() {
@@ -16,9 +17,25 @@ export function AdminLoginPageClient() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (getAdminToken()) {
-      router.replace("/");
+    let disposed = false;
+
+    async function validateStoredSession() {
+      try {
+        const session = await validateInternalSession();
+
+        if (!disposed && session) {
+          router.replace(session.user.role === "ADMIN" ? "/" : getRhDashboardPath(session.user));
+        }
+      } catch {
+        // Mantem o usuario no login quando a sessao armazenada nao puder ser validada.
+      }
     }
+
+    void validateStoredSession();
+
+    return () => {
+      disposed = true;
+    };
   }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

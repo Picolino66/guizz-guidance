@@ -94,7 +94,10 @@ export function RhInterviewDetailPageClient({ id }: Props) {
   if (!interview) return <RhLayout><div className="rh-empty">Entrevista não encontrada.</div></RhLayout>
 
   const iv = interview
-  const proposedSlots = iv.slots.filter((s) => s.status === "PROPOSED")
+  const slotBadgeClass = (status: string) =>
+    `rh-badge ${status === "CONFIRMED" ? "rh-badge--slot-confirmed" : status === "REJECTED" ? "rh-badge--slot-rejected" : "rh-badge--proposed"}`
+  const slotBadgeLabel = (status: string) =>
+    status === "PROPOSED" ? "Proposto" : status === "CONFIRMED" ? "Confirmado" : "Recusado"
 
   return (
     <RhLayout>
@@ -126,9 +129,8 @@ export function RhInterviewDetailPageClient({ id }: Props) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-          {/* Candidato */}
           <div className="rh-card">
-            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Candidato</h3>
+            <h3 className="rh-card__title">Candidato</h3>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {[
                 ["Senioridade pretendida", iv.candidate.pretensaoSenioridade || "—"],
@@ -137,18 +139,18 @@ export function RhInterviewDetailPageClient({ id }: Props) {
                 ["Ferramentas", iv.candidate.ferramentas],
               ].map(([label, value]) => (
                 <div key={label}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
-                  <div style={{ fontSize: 14, color: "#334155", marginTop: 2 }}>{value}</div>
+                  <div className="rh-field__label">{label}</div>
+                  <div className="rh-field__value">{value}</div>
                 </div>
               ))}
             </div>
             <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Resumo</div>
-              <div style={{ fontSize: 14, color: "#334155", marginTop: 4, lineHeight: 1.6 }}>{iv.candidate.resumoProfissional}</div>
+              <div className="rh-field__label">Resumo</div>
+              <div className="rh-field__body">{iv.candidate.resumoProfissional}</div>
             </div>
             <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Motivação para mudança</div>
-              <div style={{ fontSize: 14, color: "#334155", marginTop: 4, lineHeight: 1.6 }}>{iv.candidate.motivacaoMudanca}</div>
+              <div className="rh-field__label">Motivação para mudança</div>
+              <div className="rh-field__body">{iv.candidate.motivacaoMudanca}</div>
             </div>
             {iv.candidate.linkedinUrl && (
               <a href={iv.candidate.linkedinUrl} target="_blank" rel="noreferrer" className="rh-btn rh-btn--ghost rh-btn--sm" style={{ marginTop: 12 }}>
@@ -157,11 +159,10 @@ export function RhInterviewDetailPageClient({ id }: Props) {
             )}
           </div>
 
-          {/* Slots */}
           <div className="rh-card">
-            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Datas Propostas</h3>
+            <h3 className="rh-card__title">Datas Propostas</h3>
             {iv.slots.length === 0 ? (
-              <div style={{ color: "#94a3b8", fontSize: 14 }}>Nenhuma data proposta ainda.</div>
+              <div className="rh-field__muted">Nenhuma data proposta ainda.</div>
             ) : (
               <div className="rh-slot-list">
                 {iv.slots.map((slot) => (
@@ -171,9 +172,7 @@ export function RhInterviewDetailPageClient({ id }: Props) {
                       <div className="rh-slot__by">Por {slot.createdBy.name}</div>
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
-                      <span className={`rh-badge ${slot.status === "CONFIRMED" ? "bg-emerald-100 text-emerald-700" : slot.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>
-                        {slot.status === "PROPOSED" ? "Proposto" : slot.status === "CONFIRMED" ? "Confirmado" : "Recusado"}
-                      </span>
+                      <span className={slotBadgeClass(slot.status)}>{slotBadgeLabel(slot.status)}</span>
                       {slot.status === "PROPOSED" && iv.status === "WAITING_TECH_CONFIRMATION" && (
                         <button className="rh-btn rh-btn--primary rh-btn--sm" onClick={() => confirmSlot(slot.id)}>Confirmar</button>
                       )}
@@ -202,49 +201,46 @@ export function RhInterviewDetailPageClient({ id }: Props) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Entrevistadores */}
           <div className="rh-card">
-              <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Entrevistadores</h3>
-              {iv.assignees.length === 0
-                ? <div style={{ color: "#94a3b8", fontSize: 14, marginBottom: 12 }}>Nenhum vinculado.</div>
-                : iv.assignees.map((a) => (
-                  <div key={a.user.id} style={{ padding: "8px 0", borderBottom: "1px solid #f1f5f9", fontSize: 14, color: "#334155" }}>
-                    {a.user.name}
-                  </div>
+            <h3 className="rh-card__title">Entrevistadores</h3>
+            {iv.assignees.length === 0
+              ? <div className="rh-field__muted" style={{ marginBottom: 12 }}>Nenhum vinculado.</div>
+              : iv.assignees.map((a) => (
+                <div key={a.user.id} className="rh-assignee-item">
+                  {a.user.name}
+                </div>
+              ))}
+            <div style={{ marginTop: 12 }}>
+              <select
+                className="rh-select"
+                multiple
+                style={{ height: 100 }}
+                value={selectedUserIds}
+                onChange={(e) => setSelectedUserIds(Array.from(e.target.selectedOptions, (o) => o.value))}
+              >
+                {users.filter((u) => !iv.assignees.some((a) => a.user.id === u.id)).map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
-              <div style={{ marginTop: 12 }}>
-                <select
-                  className="rh-select"
-                  multiple
-                  style={{ height: 100 }}
-                  value={selectedUserIds}
-                  onChange={(e) => setSelectedUserIds(Array.from(e.target.selectedOptions, (o) => o.value))}
-                >
-                  {users.filter((u) => !iv.assignees.some((a) => a.user.id === u.id)).map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
-                <button className="rh-btn rh-btn--secondary rh-btn--sm" style={{ marginTop: 8 }} onClick={assign}>
-                  + Vincular Selecionados
-                </button>
-              </div>
+              </select>
+              <button className="rh-btn rh-btn--secondary rh-btn--sm" style={{ marginTop: 8 }} onClick={assign}>
+                + Vincular Selecionados
+              </button>
+            </div>
           </div>
 
-          {/* Vaga */}
           <div className="rh-card">
-            <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Vaga</h3>
+            <h3 className="rh-card__title rh-card__title--sm">Vaga</h3>
             <div style={{ fontSize: 15, fontWeight: 600 }}>{iv.jobPosition.titulo}</div>
-            <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{iv.jobPosition.nivel}</div>
+            <div className="rh-field__muted" style={{ marginTop: 2 }}>{iv.jobPosition.nivel}</div>
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 10 }}>
               {iv.jobPosition.stackTags.map((t) => (
-                <span key={t} className="rh-badge" style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 11 }}>{t}</span>
+                <span key={t} className="rh-badge rh-badge--info" style={{ fontSize: 11 }}>{t}</span>
               ))}
             </div>
           </div>
 
-          {/* Timeline */}
           <div className="rh-card">
-            <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Histórico</h3>
+            <h3 className="rh-card__title">Histórico</h3>
             <div className="rh-timeline">
               {iv.auditLogs.map((log, i) => (
                 <div key={log.id} className="rh-timeline-item">

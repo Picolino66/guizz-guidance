@@ -82,15 +82,15 @@ export function RhLoginPageClient() {
             />
           </div>
 
-          <button className="rh-btn rh-btn--primary" style={{ width: "100%", justifyContent: "center" }} type="submit" disabled={loading}>
+          <button className="rh-btn rh-btn--primary rh-btn--full" type="submit" disabled={loading}>
             {loading ? "Entrando..." : "Entrar"}
           </button>
 
           {error && <div className="rh-error">{error}</div>}
 
-          <p style={{ marginTop: 12, fontSize: 13, color: "#64748b", textAlign: "center" }}>
+          <p className="rh-login-footnote">
             Voltar ao login administrativo?{" "}
-            <Link href="/login" style={{ fontWeight: 700, textDecoration: "underline" }}>
+            <Link href="/login" className="rh-login-footnote__link">
               Acessar `/login`
             </Link>
           </p>

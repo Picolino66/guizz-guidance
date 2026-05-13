@@ -49,10 +49,7 @@ export function WhatsappLogsPageClient() {
       <header className="whatsapp-page__hero">
         <div>
           <p className="whatsapp-page__eyebrow">Logs</p>
-          <h2 className="whatsapp-page__title">Acompanhe o histórico de envios e falhas</h2>
-          <p className="whatsapp-page__subtitle">
-            O log mostra o grupo alvo, o horário da tentativa e o estado final da execução.
-          </p>
+          <h2 className="whatsapp-page__title">Histórico de envios e falhas</h2>
         </div>
       </header>
 
@@ -96,9 +93,9 @@ export function WhatsappLogsPageClient() {
             logs.map((log) => (
               <article className="whatsapp-list-item" key={log.id}>
                 <div>
-                  <strong>{log.targetGroupJid}</strong>
+                  <strong>{log.targetType === "GROUP" ? "Grupo" : "Contato"}</strong>
                   <p>
-                    {log.status} · {log.createdAt ? new Date(log.createdAt).toLocaleString("pt-BR") : "—"} · {log.triggeredBy}
+                    {log.targetJid} · {log.status} · {log.createdAt ? new Date(log.createdAt).toLocaleString("pt-BR") : "—"} · {log.triggeredBy}
                   </p>
                 </div>
 

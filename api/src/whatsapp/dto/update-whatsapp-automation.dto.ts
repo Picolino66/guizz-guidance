@@ -12,7 +12,11 @@ import {
   Max,
   Min
 } from "class-validator"
-import { WhatsappAutomationKind, WhatsappAutomationStatus } from "@prisma/client"
+import {
+  WhatsappAutomationKind,
+  WhatsappAutomationStatus,
+  WhatsappAutomationTargetType
+} from "@prisma/client"
 
 export class UpdateWhatsappAutomationDto {
   @IsOptional()
@@ -32,8 +36,30 @@ export class UpdateWhatsappAutomationDto {
   status?: WhatsappAutomationStatus
 
   @IsOptional()
+  @IsEnum(WhatsappAutomationTargetType)
+  targetType?: WhatsappAutomationTargetType
+
+  @IsOptional()
   @IsString()
-  targetGroupJid?: string
+  targetJid?: string
+
+  @IsOptional()
+  @IsString()
+  imageBase64?: string
+
+  @IsOptional()
+  @IsString()
+  imageMimeType?: string
+
+  @IsOptional()
+  @IsString()
+  imageFileName?: string
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  mentionNumbers?: string[]
 
   @IsOptional()
   @IsDateString()

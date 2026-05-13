@@ -4,15 +4,15 @@ import { getAdminToken } from "./session"
 export type WhatsappSessionStatus = "DISCONNECTED" | "CONNECTING" | "QR_REQUIRED" | "READY" | "ERROR"
 export type WhatsappAutomationKind = "ONE_SHOT" | "REMINDER" | "DAILY" | "WEEKLY" | "MONTHLY" | "BIRTHDAY"
 export type WhatsappAutomationStatus = "ACTIVE" | "PAUSED" | "ARCHIVED"
+export type WhatsappAutomationTargetType = "GROUP" | "CONTACT"
 export type WhatsappDispatchStatus = "PENDING" | "RETRYING" | "SENT" | "FAILED" | "SKIPPED"
+export type WhatsappImageMimeType = "image/jpeg" | "image/png" | "image/webp"
 
 export interface WhatsappConnection {
   id: string
   key: string
   label: string
   phoneNumber: string | null
-  groupName: string | null
-  groupJid: string | null
   status: WhatsappSessionStatus
   qrCode: string | null
   lastConnectedAt: string | null
@@ -30,7 +30,12 @@ export interface WhatsappAutomation {
   message: string
   kind: WhatsappAutomationKind
   status: WhatsappAutomationStatus
-  targetGroupJid: string | null
+  targetType: WhatsappAutomationTargetType | null
+  targetJid: string | null
+  imageBase64: string | null
+  imageMimeType: WhatsappImageMimeType | null
+  imageFileName: string | null
+  mentionJids: string[]
   scheduledFor: string | null
   timeOfDay: string | null
   daysOfWeek: number[]
@@ -50,7 +55,8 @@ export interface WhatsappDispatchLog {
   automationId: string | null
   connectionId: string
   dispatchKey: string
-  targetGroupJid: string
+  targetType: WhatsappAutomationTargetType
+  targetJid: string
   message: string
   status: WhatsappDispatchStatus
   attempts: number
@@ -80,6 +86,20 @@ export interface WhatsappOverview {
 export interface WhatsappGroup {
   jid: string
   name: string
+}
+
+export interface WhatsappGroupParticipant {
+  jid: string
+  name: string
+  phoneNumber: string
+  mentionText: string
+  isAdmin: boolean
+}
+
+export interface WhatsappContact {
+  jid: string
+  name: string
+  phoneNumber: string
 }
 
 export async function whatsappFetch<T>(path: string, options: RequestInit = {}) {

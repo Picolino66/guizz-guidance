@@ -6,7 +6,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react"
 import { Icon } from "../icons"
 import { clearAdminToken, getSystemUser, type SystemUser } from "../../lib/session"
 
-export type AppShellSection = "home" | "rh" | "whatsapp" | "quiz"
+export type AppShellSection = "home" | "contacts" | "rh" | "whatsapp" | "quiz"
 
 type QuizView = "dashboard" | "quizzes" | "participants" | "settings"
 
@@ -35,10 +35,10 @@ const rhLinks = [
 ]
 
 const whatsappLinks = [
-  { href: "/whatsapp", label: "Dashboard" },
-  { href: "/whatsapp/automations", label: "Automações" },
-  { href: "/whatsapp/logs", label: "Logs" },
-  { href: "/whatsapp/connection", label: "Conexão" }
+  { href: "/whatsapp", label: "Dashboard", exact: true },
+  { href: "/whatsapp/automations", label: "Automações", exact: true },
+  { href: "/whatsapp/logs", label: "Logs", exact: true },
+  { href: "/whatsapp/connection", label: "Conexão", exact: true }
 ]
 
 function getInitialExpanded(section: AppShellSection) {
@@ -49,9 +49,10 @@ function getInitialExpanded(section: AppShellSection) {
   }
 }
 
-function isPathActive(pathname: string | null, href: string) {
+function isPathActive(pathname: string | null, href: string, options?: { exact?: boolean }) {
   if (!pathname) return false
   if (href === "/") return pathname === "/" || pathname === "/hub"
+  if (options?.exact) return pathname === href
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
@@ -66,10 +67,13 @@ export function AppShell({ children, quizNavigation, section }: AppShellProps) {
   const [user, setUser] = useState<SystemUser | null>(null)
 
   useEffect(() => {
-    setExpanded((current) => ({
-      ...current,
-      [section]: section !== "home"
-    }))
+    if (section === "rh" || section === "whatsapp" || section === "quiz") {
+      setExpanded((current) => ({
+        ...current,
+        [section]: true
+      }))
+    }
+
     setUser(getSystemUser())
   }, [section])
 
@@ -106,6 +110,15 @@ export function AppShell({ children, quizNavigation, section }: AppShellProps) {
           >
             <Icon className="h-4 w-4" name="home" />
             <span>Home</span>
+          </Link>
+
+          <Link
+            aria-current={section === "contacts" ? "page" : undefined}
+            className={`app-nav__item${section === "contacts" ? " is-active" : ""}`}
+            href={"/contacts" as LinkProps<string>["href"]}
+          >
+            <Icon className="h-4 w-4" name="mail" />
+            <span>Contato</span>
           </Link>
 
           <div className="app-nav__group">
@@ -152,8 +165,8 @@ export function AppShell({ children, quizNavigation, section }: AppShellProps) {
               <div className="app-nav__children">
                 {whatsappLinks.map((link) => (
                   <Link
-                    aria-current={isPathActive(pathname, link.href) ? "page" : undefined}
-                    className={`app-nav__child${isPathActive(pathname, link.href) ? " is-active" : ""}`}
+                    aria-current={isPathActive(pathname, link.href, { exact: link.exact }) ? "page" : undefined}
+                    className={`app-nav__child${isPathActive(pathname, link.href, { exact: link.exact }) ? " is-active" : ""}`}
                     href={link.href as LinkProps<string>["href"]}
                     key={link.href}
                   >

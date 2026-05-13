@@ -15,6 +15,7 @@ Area administrativa para operar quizzes, whitelist, dashboard da rodada e a entr
 - `client/components/rh/hub-page-client.tsx`
 - `client/components/whatsapp/whatsapp-layout.tsx`
 - `client/app/admin-guidance/page.tsx`
+- `client/lib/internal-session.ts`
 - `client/lib/session.ts`
 - `client/lib/rh-session.ts`
 
@@ -38,9 +39,11 @@ Area administrativa para operar quizzes, whitelist, dashboard da rodada e a entr
 - `NEXT_PUBLIC_API_BASE_URL`
 - Token do admin
 - API de admin em `/auth` e `/admin`
+- Validacao de sessao interna em `GET /auth/session`
 
 ## Regras de negocio
-- O login redireciona para `/` quando o token admin ja existe.
+- O login redireciona para `/` somente quando o token admin armazenado e validado em `/auth/session`.
+- Hub e dashboard admin redirecionam para `/login` quando a sessao interna esta ausente, expirada ou invalida.
 - O login RH/TECH usa a mesma tela `/login` com `role=rh`.
 - O hub e a entrada administrativa renderiza o shell compartilhado com conteudo central vazio.
 - O acesso aos modulos ocorre pelo sidebar compartilhado.
@@ -60,5 +63,5 @@ Area administrativa para operar quizzes, whitelist, dashboard da rodada e a entr
 
 ## Possiveis erros
 - Credenciais invalidas
-- Token ausente ou expirado
+- Token ausente, expirado ou invalido
 - Validacao de formularios de quiz, pergunta ou whitelist

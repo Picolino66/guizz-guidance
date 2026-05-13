@@ -5,7 +5,8 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./icons";
 import { AppShell, type AppShellQuizNavigationItem } from "./layout/app-shell";
 import { QuizStatus, apiFetch, isUnauthorizedError } from "../lib/api";
-import { clearAdminToken, getAdminToken } from "../lib/session";
+import { useRequireInternalSession } from "../lib/internal-session";
+import { clearAdminToken } from "../lib/session";
 import { formatElapsedTime } from "../lib/time";
 
 type AdminView = "dashboard" | "quizzes" | "results" | "participants" | "settings";
@@ -433,6 +434,7 @@ async function fetchAllowedEmails(token: string) {
 
 export function AdminDashboardPageClient() {
   const router = useRouter();
+  const internalSession = useRequireInternalSession();
   const [token, setToken] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(true);
@@ -496,17 +498,13 @@ export function AdminDashboardPageClient() {
     (activeView === "quizzes" && quizzesMode === "list");
 
   useEffect(() => {
-    const storedToken = getAdminToken();
-
-    if (!storedToken) {
-      setIsReady(true);
-      router.replace("/login");
+    if (internalSession.isChecking) {
       return;
     }
 
-    setToken(storedToken);
+    setToken(internalSession.token);
     setIsReady(true);
-  }, [router]);
+  }, [internalSession.isChecking, internalSession.token]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {

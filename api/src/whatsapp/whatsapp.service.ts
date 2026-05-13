@@ -6,36 +6,67 @@ import {
 } from "@nestjs/common"
 import { Cron, CronExpression } from "@nestjs/schedule"
 import {
+  Contact,
   Prisma,
   WhatsappAutomation,
   WhatsappAutomationKind,
   WhatsappAutomationStatus,
+  WhatsappAutomationTargetType,
   WhatsappConnection,
   WhatsappDispatchLog,
   WhatsappDispatchStatus,
+  WhatsappGroup,
   WhatsappSessionStatus
 } from "@prisma/client"
+import { buildSearchText, normalizeSearchTextPart } from "../common/utils/search-text"
 import { PrismaService } from "../prisma/prisma.service"
 import { CreateWhatsappAutomationDto } from "./dto/create-whatsapp-automation.dto"
 import { ListWhatsappLogsDto } from "./dto/list-whatsapp-logs.dto"
 import { SendWhatsappMessageDto } from "./dto/send-whatsapp-message.dto"
 import { UpdateWhatsappAutomationDto } from "./dto/update-whatsapp-automation.dto"
 import { UpdateWhatsappConnectionDto } from "./dto/update-whatsapp-connection.dto"
-import { WhatsappAdapter } from "./whatsapp.adapter"
+import {
+  type WhatsappDirectorySyncResult,
+  type WhatsappGroupParticipant,
+  type WhatsappOutboundMessage,
+  WhatsappAdapter
+} from "./whatsapp.adapter"
 import { WhatsappGateway } from "./whatsapp.gateway"
 import { resolveWhatsappNextRunAt, type WhatsappScheduleInput } from "./whatsapp-schedule"
 
 const DEFAULT_CONNECTION_LABEL = "Canal WhatsApp Guidance"
 const DEFAULT_TIME_ZONE = "America/Sao_Paulo"
 const WHATSAPP_GROUP_JID_PATTERN = /^[\w.-]+@g\.us$/
+const WHATSAPP_CONTACT_JID_PATTERN = /^(?:\d+@s\.whatsapp\.net|[\w.-]+@lid)$/
+const MAX_WHATSAPP_IMAGE_BYTES = 5 * 1024 * 1024
+const WHATSAPP_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
+const WHATSAPP_IMAGE_DATA_URL_PATTERN = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/i
+const WHATSAPP_VISUAL_MENTION_PATTERN = /(?:^|[^\w])@(\d{8,15})(?!\w)/g
+const WHATSAPP_ANY_VISUAL_MENTION_PATTERN = /(?:^|[^\w])@[^\s@]+/
+const WHATSAPP_DIRECTORY_SEARCH_LIMIT = 20
+
+interface WhatsappRichMessageInput {
+  message?: string | null
+  imageBase64?: string | null
+  imageMimeType?: string | null
+  imageFileName?: string | null
+  mentionNumbers?: string[] | null
+  mentionJids?: string[] | null
+}
+
+interface WhatsappRichMessagePayload {
+  message: string
+  imageBase64: string | null
+  imageMimeType: string | null
+  imageFileName: string | null
+  mentionJids: string[]
+}
 
 export interface WhatsappConnectionView {
   id: string
   key: string
   label: string
   phoneNumber: string | null
-  groupName: string | null
-  groupJid: string | null
   status: WhatsappSessionStatus
   qrCode: string | null
   lastConnectedAt: string | null
@@ -53,7 +84,12 @@ export interface WhatsappAutomationView {
   message: string
   kind: WhatsappAutomationKind
   status: WhatsappAutomationStatus
-  targetGroupJid: string | null
+  targetType: WhatsappAutomationTargetType | null
+  targetJid: string | null
+  imageBase64: string | null
+  imageMimeType: string | null
+  imageFileName: string | null
+  mentionJids: string[]
   scheduledFor: string | null
   timeOfDay: string | null
   daysOfWeek: number[]
@@ -73,7 +109,8 @@ export interface WhatsappDispatchLogView {
   automationId: string | null
   connectionId: string
   dispatchKey: string
-  targetGroupJid: string
+  targetType: WhatsappAutomationTargetType
+  targetJid: string
   message: string
   status: WhatsappDispatchStatus
   attempts: number
@@ -85,6 +122,27 @@ export interface WhatsappDispatchLogView {
   createdAt: string
   updatedAt: string
 }
+
+export interface WhatsappGroupParticipantView {
+  jid: string
+  name: string
+  phoneNumber: string
+  mentionText: string
+  isAdmin: boolean
+}
+
+export interface WhatsappContactView {
+  jid: string
+  name: string
+  phoneNumber: string
+}
+
+export interface WhatsappGroupView {
+  jid: string
+  name: string
+}
+
+export interface WhatsappDirectorySyncView extends WhatsappDirectorySyncResult {}
 
 @Injectable()
 export class WhatsappService implements OnModuleInit {
@@ -190,16 +248,12 @@ export class WhatsappService implements OnModuleInit {
 
   async updateConnection(dto: UpdateWhatsappConnectionDto) {
     const connection = await this.ensurePrimaryConnection()
-    const groupJid = this.normalizeOptionalString(dto.groupJid)
-    this.validateGroupJid(groupJid)
 
     const updated = await this.prisma.whatsappConnection.update({
       where: { id: connection.id },
       data: {
         label: dto.label?.trim() || connection.label,
-        phoneNumber: this.normalizeOptionalString(dto.phoneNumber),
-        groupName: this.normalizeOptionalString(dto.groupName),
-        groupJid
+        phoneNumber: this.normalizeOptionalString(dto.phoneNumber)
       }
     })
 
@@ -270,18 +324,23 @@ export class WhatsappService implements OnModuleInit {
   async createAutomation(dto: CreateWhatsappAutomationDto) {
     const connection = await this.ensurePrimaryConnection()
     this.validateAutomationSchedule(dto.kind, dto)
-    const targetGroupJid = this.normalizeOptionalString(dto.targetGroupJid)
-    this.validateGroupJid(targetGroupJid)
+    const target = this.resolveTargetInput(dto.targetType, dto.targetJid)
+    const richMessage = this.normalizeRichMessagePayload(dto)
     const nextRunAt = this.resolveNextRunAt(dto.kind, dto)
 
     const row = await this.prisma.whatsappAutomation.create({
       data: {
         connectionId: connection.id,
         title: dto.title.trim(),
-        message: dto.message.trim(),
+        message: richMessage.message,
         kind: dto.kind,
         status: dto.status ?? WhatsappAutomationStatus.ACTIVE,
-        targetGroupJid,
+        targetType: target.type,
+        targetJid: target.jid,
+        imageBase64: richMessage.imageBase64,
+        imageMimeType: richMessage.imageMimeType,
+        imageFileName: richMessage.imageFileName,
+        mentionJids: richMessage.mentionJids,
         scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : null,
         timeOfDay: this.normalizeOptionalString(dto.timeOfDay),
         daysOfWeek: dto.daysOfWeek ?? [],
@@ -298,8 +357,7 @@ export class WhatsappService implements OnModuleInit {
   async updateAutomation(id: string, dto: UpdateWhatsappAutomationDto) {
     const existing = await this.ensureAutomation(id)
     const kind = dto.kind ?? existing.kind
-    const targetGroupJid = dto.targetGroupJid === undefined ? undefined : this.normalizeOptionalString(dto.targetGroupJid)
-    this.validateGroupJid(targetGroupJid)
+    const target = this.resolveTargetInput(dto.targetType ?? existing.targetType, dto.targetJid ?? existing.targetJid)
     const runtimeInput = {
       scheduledFor: dto.scheduledFor ?? existing.scheduledFor?.toISOString() ?? null,
       timeOfDay: dto.timeOfDay ?? existing.timeOfDay,
@@ -308,16 +366,36 @@ export class WhatsappService implements OnModuleInit {
       monthDay: dto.monthDay ?? existing.monthDay
     }
     this.validateAutomationSchedule(kind, runtimeInput)
+    const richMessage =
+      dto.message !== undefined ||
+      dto.imageBase64 !== undefined ||
+      dto.imageMimeType !== undefined ||
+      dto.imageFileName !== undefined ||
+      dto.mentionNumbers !== undefined
+        ? this.normalizeRichMessagePayload({
+            message: dto.message ?? existing.message,
+            imageBase64: dto.imageBase64 ?? existing.imageBase64,
+            imageMimeType: dto.imageMimeType ?? existing.imageMimeType,
+            imageFileName: dto.imageFileName ?? existing.imageFileName,
+            mentionNumbers: dto.mentionNumbers,
+            mentionJids: dto.mentionNumbers === undefined ? existing.mentionJids : undefined
+          })
+        : null
     const nextRunAt = this.resolveNextRunAt(kind, runtimeInput)
 
     const row = await this.prisma.whatsappAutomation.update({
       where: { id },
       data: {
         title: dto.title?.trim(),
-        message: dto.message?.trim(),
+        message: richMessage?.message,
         kind: dto.kind,
         status: dto.status,
-        targetGroupJid,
+        targetType: dto.targetType === undefined ? undefined : target.type,
+        targetJid: dto.targetJid === undefined ? undefined : target.jid,
+        imageBase64: richMessage ? richMessage.imageBase64 : undefined,
+        imageMimeType: richMessage ? richMessage.imageMimeType : undefined,
+        imageFileName: richMessage ? richMessage.imageFileName : undefined,
+        mentionJids: richMessage ? richMessage.mentionJids : undefined,
         scheduledFor: dto.scheduledFor === undefined ? undefined : dto.scheduledFor ? new Date(dto.scheduledFor) : null,
         timeOfDay: dto.timeOfDay === undefined ? undefined : this.normalizeOptionalString(dto.timeOfDay),
         daysOfWeek: dto.daysOfWeek ?? undefined,
@@ -334,6 +412,11 @@ export class WhatsappService implements OnModuleInit {
 
   async toggleAutomation(id: string) {
     const existing = await this.ensureAutomation(id)
+
+    if (existing.status === WhatsappAutomationStatus.ARCHIVED) {
+      throw new BadRequestException("Automações arquivadas não podem ser reativadas.")
+    }
+
     const nextStatus =
       existing.status === WhatsappAutomationStatus.ACTIVE
         ? WhatsappAutomationStatus.PAUSED
@@ -363,28 +446,26 @@ export class WhatsappService implements OnModuleInit {
 
   async sendTestMessage(dto: SendWhatsappMessageDto) {
     const connection = await this.ensurePrimaryConnection()
-    const targetGroupJid = this.normalizeOptionalString(dto.targetGroupJid) ?? connection.groupJid
-    this.validateGroupJid(targetGroupJid)
-
-    if (!targetGroupJid) {
-      throw new BadRequestException("Defina o grupo alvo antes de testar o envio.")
-    }
-
+    const target = this.resolveTargetInput(dto.targetType, dto.targetJid)
+    const richMessage = this.normalizeRichMessagePayload(dto)
+    const metadata = this.buildDispatchMetadata(richMessage)
     const dispatchKey = `manual:${connection.id}:${Date.now()}`
     const log = await this.prisma.whatsappDispatchLog.create({
       data: {
         connectionId: connection.id,
         dispatchKey,
-        targetGroupJid,
-        message: dto.message.trim(),
+        targetType: target.type,
+        targetJid: target.jid,
+        message: richMessage.message,
         status: WhatsappDispatchStatus.PENDING,
         attempts: 1,
-        triggeredBy: "manual-test"
+        triggeredBy: "manual-test",
+        metadata
       }
     })
 
     try {
-      await this.sendMessage(targetGroupJid, dto.message.trim())
+      await this.sendMessage(target.jid, richMessage)
       const row = await this.prisma.whatsappDispatchLog.update({
         where: { id: log.id },
         data: {
@@ -407,12 +488,128 @@ export class WhatsappService implements OnModuleInit {
     }
   }
 
-  async listGroups() {
+  async listGroups(search?: string) {
+    const connection = await this.ensurePrimaryConnection()
+    const rows = await this.prisma.whatsappGroup.findMany({
+      where: {
+        connectionId: connection.id,
+        isAvailable: true,
+        ...this.buildDirectorySearchWhere(search)
+      },
+      orderBy: [{ name: "asc" }, { jid: "asc" }],
+      take: WHATSAPP_DIRECTORY_SEARCH_LIMIT
+    })
+
+    return rows.map((group) => this.toGroupView(group))
+  }
+
+  async listContacts(search?: string) {
+    const rows = await this.prisma.contact.findMany({
+      where: {
+        phoneNumber: {
+          not: null
+        },
+        ...this.buildDirectorySearchWhere(search)
+      },
+      orderBy: [{ name: "asc" }, { email: "asc" }, { phoneNumber: "asc" }],
+      take: WHATSAPP_DIRECTORY_SEARCH_LIMIT
+    })
+
+    return rows.map((contact) => this.toContactView(contact))
+  }
+
+  async syncDirectory(): Promise<WhatsappDirectorySyncView> {
     if (!this.adapter.isReady()) {
-      throw new BadRequestException("WhatsApp não está conectado. Conecte-se antes de listar os grupos.")
+      throw new BadRequestException("WhatsApp não está conectado. Conecte-se antes de sincronizar.")
     }
 
-    return this.adapter.getGroups()
+    const connection = await this.ensurePrimaryConnection()
+    await this.adapter.syncDirectory()
+
+    const now = new Date()
+    const groups = await this.adapter.getGroups()
+    const groupJids = groups.map((group) => group.jid)
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.whatsappGroup.updateMany({
+        where: {
+          connectionId: connection.id,
+          ...(groupJids.length > 0
+            ? {
+                jid: {
+                  notIn: groupJids
+                }
+              }
+            : {})
+        },
+        data: {
+          isAvailable: false
+        }
+      })
+
+      for (const group of groups) {
+        await tx.whatsappGroup.upsert({
+          where: {
+            connectionId_jid: {
+              connectionId: connection.id,
+              jid: group.jid
+            }
+          },
+          create: {
+            connectionId: connection.id,
+            jid: group.jid,
+            name: group.name,
+            searchText: this.buildGroupSearchText(group.name, group.jid),
+            isAvailable: true,
+            lastSyncedAt: now
+          },
+          update: {
+            name: group.name,
+            searchText: this.buildGroupSearchText(group.name, group.jid),
+            isAvailable: true,
+            lastSyncedAt: now
+          }
+        })
+      }
+    })
+
+    const [contactCount, groupCount] = await Promise.all([
+      this.prisma.contact.count({
+        where: {
+          phoneNumber: {
+            not: null
+          }
+        }
+      }),
+      this.prisma.whatsappGroup.count({
+        where: {
+          connectionId: connection.id,
+          isAvailable: true
+        }
+      })
+    ])
+
+    return {
+      contactCount,
+      groupCount
+    }
+  }
+
+  async listGroupParticipants(groupJid?: string) {
+    if (!this.adapter.isReady()) {
+      throw new BadRequestException("WhatsApp não está conectado. Conecte-se antes de listar os participantes.")
+    }
+
+    const normalizedGroupJid = this.normalizeOptionalString(groupJid)
+    this.validateGroupJid(normalizedGroupJid)
+
+    if (!normalizedGroupJid) {
+      throw new BadRequestException("Informe o grupo alvo antes de buscar participantes.")
+    }
+
+    return (await this.adapter.getGroupParticipants(normalizedGroupJid)).map((participant) =>
+      this.toGroupParticipantView(participant)
+    )
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -449,20 +646,20 @@ export class WhatsappService implements OnModuleInit {
 
   private async dispatchAutomation(automation: WhatsappAutomation, triggeredBy: string) {
     const connection = await this.ensurePrimaryConnection()
-    const targetGroupJid = automation.targetGroupJid ?? connection.groupJid
-
-    if (!targetGroupJid) {
+    if (!automation.targetType || !automation.targetJid) {
       const row = await this.prisma.whatsappDispatchLog.create({
         data: {
           automationId: automation.id,
           connectionId: connection.id,
           dispatchKey: `${automation.id}:${Date.now()}:missing-target`,
-          targetGroupJid: connection.groupJid ?? "não-configurado",
+          targetType: WhatsappAutomationTargetType.GROUP,
+          targetJid: "nao-configurado",
           message: automation.message,
           status: WhatsappDispatchStatus.SKIPPED,
           attempts: 0,
-          errorMessage: "Grupo alvo não configurado.",
-          triggeredBy
+          errorMessage: "Automação sem destino configurado.",
+          triggeredBy,
+          metadata: Prisma.JsonNull
         }
       })
 
@@ -471,12 +668,21 @@ export class WhatsappService implements OnModuleInit {
         data: {
           lastRunAt: new Date(),
           lastStatus: WhatsappDispatchStatus.SKIPPED,
-          lastError: "Grupo alvo não configurado."
+          lastError: "Automação sem destino configurado."
         }
       })
 
       return this.toLogView(row)
     }
+
+    const richMessage = this.normalizeRichMessagePayload({
+      message: automation.message,
+      imageBase64: automation.imageBase64,
+      imageMimeType: automation.imageMimeType,
+      imageFileName: automation.imageFileName,
+      mentionJids: automation.mentionJids
+    })
+    const metadata = this.buildDispatchMetadata(richMessage)
 
     const scheduledFor = automation.nextRunAt ?? new Date()
     const dispatchKey = `${automation.id}:${scheduledFor.toISOString()}`
@@ -493,17 +699,19 @@ export class WhatsappService implements OnModuleInit {
         automationId: automation.id,
         connectionId: connection.id,
         dispatchKey,
-        targetGroupJid,
-        message: automation.message,
+        targetType: automation.targetType,
+        targetJid: automation.targetJid,
+        message: richMessage.message,
         status: WhatsappDispatchStatus.PENDING,
         attempts: 1,
         scheduledFor,
-        triggeredBy
+        triggeredBy,
+        metadata
       }
     })
 
     try {
-      await this.sendMessage(targetGroupJid, automation.message)
+      await this.sendMessage(automation.targetJid, richMessage)
       const updatedAutomation = await this.prisma.whatsappAutomation.update({
         where: { id: automation.id },
         data: {
@@ -538,7 +746,7 @@ export class WhatsappService implements OnModuleInit {
       })
 
       try {
-        await this.sendMessage(targetGroupJid, automation.message)
+        await this.sendMessage(automation.targetJid, richMessage)
         const updatedAutomation = await this.prisma.whatsappAutomation.update({
           where: { id: automation.id },
           data: {
@@ -589,12 +797,160 @@ export class WhatsappService implements OnModuleInit {
     }
   }
 
-  private async sendMessage(targetGroupJid: string, message: string) {
+  private async sendMessage(targetJid: string, payload: WhatsappRichMessagePayload) {
     if (!this.adapter.isReady()) {
       throw new BadRequestException("A conexão WhatsApp ainda não está pronta.")
     }
 
-    await this.adapter.sendMessage(targetGroupJid, message)
+    await this.adapter.sendMessage(targetJid, this.toOutboundMessage(payload))
+  }
+
+  private normalizeRichMessagePayload(input: WhatsappRichMessageInput): WhatsappRichMessagePayload {
+    const message = input.message?.trim()
+
+    if (!message) {
+      throw new BadRequestException("Informe a mensagem do envio.")
+    }
+
+    const visualMentionNumbers = this.extractVisualMentionNumbers(message)
+    const mentionJids = this.normalizeMentionJids([
+      ...visualMentionNumbers,
+      ...(input.mentionNumbers ?? []),
+      ...(input.mentionJids ?? [])
+    ])
+    const image = this.normalizeImagePayload(input)
+
+    return {
+      message: this.withVisualMentions(message, mentionJids),
+      imageBase64: image?.base64 ?? null,
+      imageMimeType: image?.mimeType ?? null,
+      imageFileName: image?.fileName ?? null,
+      mentionJids
+    }
+  }
+
+  private normalizeImagePayload(input: WhatsappRichMessageInput) {
+    const rawImage = input.imageBase64?.trim()
+
+    if (!rawImage) {
+      return null
+    }
+
+    const dataUrlMatch = rawImage.match(WHATSAPP_IMAGE_DATA_URL_PATTERN)
+    const dataUrlMimeType = dataUrlMatch?.[1]?.toLowerCase()
+    const base64 = (dataUrlMatch?.[2] ?? rawImage).replace(/\s/g, "")
+    const mimeType = (input.imageMimeType?.trim().toLowerCase() || dataUrlMimeType) ?? null
+
+    if (!mimeType || !WHATSAPP_IMAGE_MIME_TYPES.has(mimeType)) {
+      throw new BadRequestException("A imagem deve ser JPEG, PNG ou WebP.")
+    }
+
+    if (dataUrlMimeType && dataUrlMimeType !== mimeType) {
+      throw new BadRequestException("O MIME type da imagem não confere com o Base64 informado.")
+    }
+
+    if (!/^[a-zA-Z0-9+/]+={0,2}$/.test(base64)) {
+      throw new BadRequestException("Informe uma imagem em Base64 válido.")
+    }
+
+    const buffer = Buffer.from(base64, "base64")
+    const normalizedBase64 = buffer.toString("base64").replace(/=+$/, "")
+
+    if (buffer.byteLength === 0 || normalizedBase64 !== base64.replace(/=+$/, "")) {
+      throw new BadRequestException("Informe uma imagem em Base64 válido.")
+    }
+
+    if (buffer.byteLength > MAX_WHATSAPP_IMAGE_BYTES) {
+      throw new BadRequestException("A imagem deve ter no máximo 5 MB.")
+    }
+
+    return {
+      base64,
+      mimeType,
+      fileName: this.normalizeOptionalString(input.imageFileName)
+    }
+  }
+
+  private normalizeMentionJids(values: string[]) {
+    const mentionJids = new Set<string>()
+
+    for (const value of values) {
+      const normalized = this.normalizeMentionJid(value)
+      if (normalized) {
+        mentionJids.add(normalized)
+      }
+    }
+
+    return [...mentionJids]
+  }
+
+  private extractVisualMentionNumbers(message: string) {
+    return [...message.matchAll(WHATSAPP_VISUAL_MENTION_PATTERN)].map((match) => match[1])
+  }
+
+  private normalizeMentionJid(value: string) {
+    const normalized = value.trim().toLowerCase()
+
+    if (!normalized) {
+      return null
+    }
+
+    if (WHATSAPP_CONTACT_JID_PATTERN.test(normalized)) {
+      return normalized
+    }
+
+    const digits = normalized.replace(/\D/g, "")
+
+    if (digits.length < 8 || digits.length > 15) {
+      throw new BadRequestException("Informe telefones de menção com DDD/DDI ou JIDs @s.whatsapp.net válidos.")
+    }
+
+    return `${digits}@s.whatsapp.net`
+  }
+
+  private withVisualMentions(message: string, mentionJids: string[]) {
+    if (WHATSAPP_ANY_VISUAL_MENTION_PATTERN.test(message)) {
+      return message
+    }
+
+    const missingMentions = mentionJids
+      .map((jid) => `@${jid.split("@")[0]}`)
+      .filter((mention) => !message.includes(mention))
+
+    if (missingMentions.length === 0) {
+      return message
+    }
+
+    return `${message}\n\n${missingMentions.join(" ")}`
+  }
+
+  private toOutboundMessage(payload: WhatsappRichMessagePayload): WhatsappOutboundMessage {
+    const image = payload.imageBase64
+      ? {
+          buffer: Buffer.from(payload.imageBase64, "base64"),
+          mimeType: payload.imageMimeType ?? "image/jpeg",
+          fileName: payload.imageFileName
+        }
+      : null
+
+    return {
+      text: payload.message,
+      image,
+      mentions: payload.mentionJids
+    }
+  }
+
+  private buildDispatchMetadata(payload: WhatsappRichMessagePayload): Prisma.InputJsonObject | undefined {
+    if (!payload.imageBase64 && payload.mentionJids.length === 0) {
+      return undefined
+    }
+
+    return {
+      hasImage: Boolean(payload.imageBase64),
+      imageMimeType: payload.imageMimeType,
+      imageFileName: payload.imageFileName,
+      mentionJids: payload.mentionJids
+    }
   }
 
   private async startAdapter(connection: WhatsappConnection) {
@@ -842,8 +1198,6 @@ export class WhatsappService implements OnModuleInit {
       key: connection.key,
       label: connection.label,
       phoneNumber: connection.phoneNumber,
-      groupName: connection.groupName,
-      groupJid: connection.groupJid,
       status: connection.status,
       qrCode: connection.qrCode,
       lastConnectedAt: connection.lastConnectedAt?.toISOString() ?? null,
@@ -863,7 +1217,12 @@ export class WhatsappService implements OnModuleInit {
       message: automation.message,
       kind: automation.kind,
       status: automation.status,
-      targetGroupJid: automation.targetGroupJid,
+      targetType: automation.targetType,
+      targetJid: automation.targetJid,
+      imageBase64: automation.imageBase64,
+      imageMimeType: automation.imageMimeType,
+      imageFileName: automation.imageFileName,
+      mentionJids: automation.mentionJids,
       scheduledFor: automation.scheduledFor?.toISOString() ?? null,
       timeOfDay: automation.timeOfDay,
       daysOfWeek: automation.daysOfWeek,
@@ -885,7 +1244,8 @@ export class WhatsappService implements OnModuleInit {
       automationId: log.automationId,
       connectionId: log.connectionId,
       dispatchKey: log.dispatchKey,
-      targetGroupJid: log.targetGroupJid,
+      targetType: log.targetType,
+      targetJid: log.targetJid,
       message: log.message,
       status: log.status,
       attempts: log.attempts,
@@ -899,14 +1259,89 @@ export class WhatsappService implements OnModuleInit {
     }
   }
 
+  private toGroupParticipantView(participant: WhatsappGroupParticipant): WhatsappGroupParticipantView {
+    return {
+      jid: participant.jid,
+      name: participant.name,
+      phoneNumber: participant.phoneNumber,
+      mentionText: `@${participant.name}`,
+      isAdmin: participant.isAdmin
+    }
+  }
+
+  private toGroupView(group: WhatsappGroup): WhatsappGroupView {
+    return {
+      jid: group.jid,
+      name: group.name
+    }
+  }
+
+  private toContactView(contact: Pick<Contact, "name" | "phoneNumber">): WhatsappContactView {
+    const phoneNumber = contact.phoneNumber ?? ""
+
+    return {
+      jid: `${phoneNumber}@s.whatsapp.net`,
+      name: contact.name?.trim() || phoneNumber,
+      phoneNumber
+    }
+  }
+
+  private buildGroupSearchText(name: string, jid: string) {
+    return buildSearchText([name, jid])
+  }
+
   private normalizeOptionalString(value?: string | null) {
     const normalized = value?.trim()
     return normalized ? normalized : null
   }
 
+  private resolveTargetInput(targetType?: WhatsappAutomationTargetType | null, targetJid?: string | null) {
+    const normalizedTargetJid = this.normalizeOptionalString(targetJid)
+
+    if (!targetType || !normalizedTargetJid) {
+      throw new BadRequestException("Informe o tipo e o destino da automação.")
+    }
+
+    this.validateTargetJid(targetType, normalizedTargetJid)
+
+    return {
+      type: targetType,
+      jid: normalizedTargetJid
+    }
+  }
+
   private validateGroupJid(value?: string | null) {
     if (value && !WHATSAPP_GROUP_JID_PATTERN.test(value)) {
       throw new BadRequestException("Informe um JID de grupo no formato 120363000000000000@g.us.")
+    }
+  }
+
+  private validateContactJid(value?: string | null) {
+    if (value && !WHATSAPP_CONTACT_JID_PATTERN.test(value)) {
+      throw new BadRequestException("Informe um JID de contato no formato 5511999999999@s.whatsapp.net ou contato@lid.")
+    }
+  }
+
+  private validateTargetJid(type: WhatsappAutomationTargetType, jid: string) {
+    if (type === WhatsappAutomationTargetType.GROUP) {
+      this.validateGroupJid(jid)
+      return
+    }
+
+    this.validateContactJid(jid)
+  }
+
+  private buildDirectorySearchWhere(search?: string | null) {
+    const normalizedSearch = normalizeSearchTextPart(search)
+
+    if (!normalizedSearch) {
+      return {}
+    }
+
+    return {
+      searchText: {
+        contains: normalizedSearch
+      }
     }
   }
 

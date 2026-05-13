@@ -1,8 +1,7 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { useEffect, useState, type ReactNode } from "react"
-import { getAdminToken } from "../../lib/session"
+import { type ReactNode } from "react"
+import { useRequireInternalSession } from "../../lib/internal-session"
 import { AppShell } from "../layout/app-shell"
 
 interface Props {
@@ -10,19 +9,9 @@ interface Props {
 }
 
 export function WhatsappLayout({ children }: Props) {
-  const router = useRouter()
-  const [mounted, setMounted] = useState(false)
+  const session = useRequireInternalSession()
 
-  useEffect(() => {
-    if (!getAdminToken()) {
-      router.replace("/login")
-      return
-    }
-
-    setMounted(true)
-  }, [router])
-
-  if (!mounted) {
+  if (session.isChecking || !session.token) {
     return null
   }
 

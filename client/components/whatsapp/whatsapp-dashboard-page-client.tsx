@@ -96,11 +96,8 @@ export function WhatsappDashboardPageClient() {
     <section className="whatsapp-page">
       <header className="whatsapp-page__hero">
         <div>
-          <p className="whatsapp-page__eyebrow">Painel operacional</p>
-          <h2 className="whatsapp-page__title">Monitore automações e estado da conexão</h2>
-          <p className="whatsapp-page__subtitle">
-            A área centraliza a sessão WhatsApp, os disparos programados e os logs de execução.
-          </p>
+          <p className="whatsapp-page__eyebrow">Dashboard</p>
+          <h2 className="whatsapp-page__title">Painel operacional</h2>
         </div>
 
         <div className={`whatsapp-status whatsapp-status--${connectionTone}`}>
@@ -149,12 +146,12 @@ export function WhatsappDashboardPageClient() {
 
           <dl className="whatsapp-meta">
             <div>
-              <dt>Grupo</dt>
-              <dd>{connection?.groupName ?? "Não configurado"}</dd>
+              <dt>Telefone</dt>
+              <dd>{connection?.phoneNumber ?? "—"}</dd>
             </div>
             <div>
-              <dt>JID</dt>
-              <dd>{connection?.groupJid ?? "—"}</dd>
+              <dt>Status</dt>
+              <dd>{connection ? statusLabels[connection.status] : "—"}</dd>
             </div>
             <div>
               <dt>Última conexão</dt>
@@ -245,6 +242,9 @@ function AutomationRow({ automation }: { automation: WhatsappAutomation }) {
         <p>
           {automation.kind} · {automation.nextRunAt ? `Próximo: ${new Date(automation.nextRunAt).toLocaleString("pt-BR")}` : "Sem próxima execução"}
         </p>
+        <p>
+          {automation.targetType === "GROUP" ? "Grupo" : automation.targetType === "CONTACT" ? "Contato" : "Sem destino"} · {automation.targetJid ?? "—"}
+        </p>
       </div>
       <span className={`whatsapp-pill whatsapp-pill--${automation.status.toLowerCase()}`}>{automation.status}</span>
     </article>
@@ -255,9 +255,9 @@ function LogRow({ log }: { log: WhatsappDispatchLog }) {
   return (
     <article className="whatsapp-row">
       <div>
-        <strong>{log.targetGroupJid}</strong>
+        <strong>{log.targetType === "GROUP" ? "Grupo" : "Contato"}</strong>
         <p>
-          {logLabels[log.status]} · {log.createdAt ? new Date(log.createdAt).toLocaleString("pt-BR") : "—"}
+          {log.targetJid} · {logLabels[log.status]} · {log.createdAt ? new Date(log.createdAt).toLocaleString("pt-BR") : "—"}
         </p>
       </div>
       <span className={`whatsapp-pill whatsapp-pill--${log.status.toLowerCase()}`}>{log.status}</span>

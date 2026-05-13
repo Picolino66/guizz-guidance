@@ -1,6 +1,7 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 
 const DEFAULT_CORS_ORIGINS = ["http://localhost:3000", "http://0.0.0.0:3000"];
@@ -17,12 +18,15 @@ function parseCorsOrigins(rawCorsOrigins: string) {
 type CorsOriginCallback = (error: Error | null, allow?: boolean) => void;
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   const configService = app.get(ConfigService);
   const port = configService.get<number>("PORT", 4000);
   const corsOrigins = parseCorsOrigins(
     configService.get<string>("CORS_ORIGIN", DEFAULT_CORS_ORIGINS.join(","))
   );
+
+  app.useBodyParser("json", { limit: "8mb" });
+  app.useBodyParser("urlencoded", { extended: true, limit: "8mb" });
 
   app.enableCors({
     origin(origin: string | undefined, callback: CorsOriginCallback) {

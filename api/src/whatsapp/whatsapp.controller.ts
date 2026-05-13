@@ -1,7 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common"
 import { AdminAuthGuard } from "../common/guards/admin-auth.guard"
 import { CreateWhatsappAutomationDto } from "./dto/create-whatsapp-automation.dto"
+import { ListWhatsappDirectoryDto } from "./dto/list-whatsapp-directory.dto"
 import { ListWhatsappLogsDto } from "./dto/list-whatsapp-logs.dto"
+import { ListWhatsappParticipantsDto } from "./dto/list-whatsapp-participants.dto"
 import { SendWhatsappMessageDto } from "./dto/send-whatsapp-message.dto"
 import { UpdateWhatsappAutomationDto } from "./dto/update-whatsapp-automation.dto"
 import { UpdateWhatsappConnectionDto } from "./dto/update-whatsapp-connection.dto"
@@ -78,7 +80,22 @@ export class WhatsappController {
   }
 
   @Get("groups")
-  listGroups() {
-    return this.whatsappService.listGroups()
+  listGroups(@Query() query: ListWhatsappDirectoryDto) {
+    return this.whatsappService.listGroups(query.search)
+  }
+
+  @Get("contacts")
+  listContacts(@Query() query: ListWhatsappDirectoryDto) {
+    return this.whatsappService.listContacts(query.search)
+  }
+
+  @Post("sync")
+  syncDirectory() {
+    return this.whatsappService.syncDirectory()
+  }
+
+  @Get("participants")
+  listGroupParticipants(@Query() query: ListWhatsappParticipantsDto) {
+    return this.whatsappService.listGroupParticipants(query.groupJid)
   }
 }

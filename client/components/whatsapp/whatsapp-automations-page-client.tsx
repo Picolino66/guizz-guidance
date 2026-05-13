@@ -1,10 +1,18 @@
 "use client"
 
-import type { FormEvent } from "react"
-import { useEffect, useState } from "react"
+import type { ChangeEvent, FormEvent } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { redirectIfUnauthorized } from "../../lib/api"
-import { whatsappFetch, type WhatsappAutomation, type WhatsappConnection } from "../../lib/whatsapp-api"
+import {
+  whatsappFetch,
+  type WhatsappAutomation,
+  type WhatsappAutomationTargetType,
+  type WhatsappConnection,
+  type WhatsappContact,
+  type WhatsappGroup,
+  type WhatsappImageMimeType
+} from "../../lib/whatsapp-api"
 
 const KIND_OPTIONS: Array<{ value: WhatsappAutomation["kind"]; label: string }> = [
   { value: "ONE_SHOT", label: "Aviso único" },
@@ -15,23 +23,161 @@ const KIND_OPTIONS: Array<{ value: WhatsappAutomation["kind"]; label: string }> 
   { value: "BIRTHDAY", label: "Aniversário" }
 ]
 
+const TARGET_TYPE_OPTIONS: Array<{ value: WhatsappAutomationTargetType; label: string }> = [
+  { value: "GROUP", label: "Grupo" },
+  { value: "CONTACT", label: "Contato" }
+]
+
+const PERIODIC_AUTOMATION_KINDS: ReadonlySet<WhatsappAutomation["kind"]> = new Set([
+  "DAILY",
+  "WEEKLY",
+  "MONTHLY",
+  "BIRTHDAY"
+])
+const WHATSAPP_IMAGE_TYPES: WhatsappImageMimeType[] = ["image/jpeg", "image/png", "image/webp"]
+const MAX_WHATSAPP_IMAGE_BYTES = 5 * 1024 * 1024
+const MAX_MENTION_SUGGESTIONS = 8
+const TARGET_SEARCH_DEBOUNCE_MS = 250
+const MENTION_SEARCH_DEBOUNCE_MS = 150
+
+type WhatsappTargetOption = {
+  jid: string
+  label: string
+  secondaryLabel: string
+}
+
+type SelectedMention = WhatsappContact & {
+  mentionToken: string
+}
+
+interface WhatsappDirectorySyncResult {
+  contactCount: number
+  groupCount: number
+}
+
+function shouldShowAutomation(automation: WhatsappAutomation) {
+  if (automation.status === "ARCHIVED") {
+    return false
+  }
+
+  return PERIODIC_AUTOMATION_KINDS.has(automation.kind) || Boolean(automation.nextRunAt)
+}
+
+function getAutomationEnhancementSummary(automation: WhatsappAutomation) {
+  const items = []
+
+  if (automation.imageBase64) {
+    items.push(automation.imageFileName ? `Foto: ${automation.imageFileName}` : "Foto anexada")
+  }
+
+  if (automation.mentionJids.length > 0) {
+    items.push(`${automation.mentionJids.length} menção${automation.mentionJids.length === 1 ? "" : "ões"}`)
+  }
+
+  return items.join(" · ")
+}
+
+function formatTargetTypeLabel(value: WhatsappAutomationTargetType) {
+  return value === "GROUP" ? "Grupo" : "Contato"
+}
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ""))
+    reader.onerror = () => reject(new Error("Não foi possível ler a imagem."))
+    reader.readAsDataURL(file)
+  })
+}
+
+function toBackendMonthDay(dayMonth: string) {
+  const [day, month] = dayMonth.split("-")
+  return day && month ? `${month}-${day}` : dayMonth
+}
+
+function findActiveMention(value: string, cursor: number) {
+  const prefix = value.slice(0, cursor)
+  const match = prefix.match(/(^|\s)@([^\s@]*)$/)
+
+  if (!match) {
+    return null
+  }
+
+  return {
+    query: match[2],
+    start: cursor - match[2].length - 1,
+    end: cursor
+  }
+}
+
+function normalizeSearch(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+}
+
+function mapGroupToTarget(group: WhatsappGroup): WhatsappTargetOption {
+  return {
+    jid: group.jid,
+    label: group.name,
+    secondaryLabel: group.jid
+  }
+}
+
+function mapContactToTarget(contact: WhatsappContact): WhatsappTargetOption {
+  return {
+    jid: contact.jid,
+    label: contact.name,
+    secondaryLabel: contact.phoneNumber
+  }
+}
+
+function buildMentionToken(contact: WhatsappContact) {
+  return `@${contact.phoneNumber}`
+}
+
+function getMentionOptionLabel(contact: WhatsappContact) {
+  return contact.name.trim() || contact.phoneNumber
+}
+
 export function WhatsappAutomationsPageClient() {
   const router = useRouter()
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
+  const messageInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const targetSearchRequestIdRef = useRef(0)
+  const mentionSearchRequestIdRef = useRef(0)
   const [automations, setAutomations] = useState<WhatsappAutomation[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [connection, setConnection] = useState<WhatsappConnection | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [message, setMessage] = useState("")
   const [title, setTitle] = useState("")
   const [kind, setKind] = useState<WhatsappAutomation["kind"]>("ONE_SHOT")
+  const [targetType, setTargetType] = useState<WhatsappAutomationTargetType>("GROUP")
+  const [targetQuery, setTargetQuery] = useState("")
+  const [targetOptions, setTargetOptions] = useState<WhatsappTargetOption[]>([])
+  const [targetOptionsLoading, setTargetOptionsLoading] = useState(false)
+  const [targetOptionsVisible, setTargetOptionsVisible] = useState(false)
+  const [syncingDirectory, setSyncingDirectory] = useState(false)
+  const [targetOptionsError, setTargetOptionsError] = useState<string | null>(null)
+  const [selectedTarget, setSelectedTarget] = useState<WhatsappTargetOption | null>(null)
   const [scheduleDate, setScheduleDate] = useState("")
   const [timeOfDay, setTimeOfDay] = useState("09:00")
-  const [targetGroupJid, setTargetGroupJid] = useState("")
   const [daysOfWeek, setDaysOfWeek] = useState("1,2,3,4,5")
   const [dayOfMonth, setDayOfMonth] = useState("1")
-  const [monthDay, setMonthDay] = useState("01-01")
+  const [birthdayDayMonth, setBirthdayDayMonth] = useState("01-01")
+  const [imageBase64, setImageBase64] = useState("")
+  const [imageMimeType, setImageMimeType] = useState<WhatsappImageMimeType | "">("")
+  const [imageFileName, setImageFileName] = useState("")
+  const [mentionOptions, setMentionOptions] = useState<WhatsappContact[]>([])
+  const [mentionOptionsLoading, setMentionOptionsLoading] = useState(false)
+  const [mentionOptionsError, setMentionOptionsError] = useState<string | null>(null)
+  const [selectedMentions, setSelectedMentions] = useState<SelectedMention[]>([])
+  const [mentionSearch, setMentionSearch] = useState<{ query: string; start: number; end: number } | null>(null)
 
   async function loadAutomations() {
     setLoading(true)
@@ -55,16 +201,186 @@ export function WhatsappAutomationsPageClient() {
     void loadAutomations()
   }, [])
 
+  useEffect(() => {
+    setTargetQuery("")
+    setTargetOptions([])
+    setTargetOptionsVisible(false)
+    setTargetOptionsError(null)
+    setSelectedTarget(null)
+    setMentionOptions([])
+    setMentionOptionsError(null)
+    setSelectedMentions([])
+    setMentionSearch(null)
+  }, [targetType])
+
+  async function syncDirectory() {
+    if (connection?.status !== "READY") {
+      setTargetOptionsError("Conecte o WhatsApp para sincronizar com o WhatsApp Web.")
+      return
+    }
+
+    setSyncingDirectory(true)
+    setTargetOptionsError(null)
+    setError(null)
+    setStatusMessage(null)
+
+    try {
+      const result = await whatsappFetch<WhatsappDirectorySyncResult>("/whatsapp/sync", {
+        method: "POST"
+      })
+
+      await loadTargetOptions(targetQuery)
+      setStatusMessage(`Sincronização concluída: ${result.contactCount} contatos e ${result.groupCount} grupos disponíveis.`)
+    } catch (err) {
+      if (redirectIfUnauthorized(err, () => router.replace("/login"))) return
+      setTargetOptionsError(err instanceof Error ? err.message : "Não foi possível sincronizar com o WhatsApp Web.")
+    } finally {
+      setSyncingDirectory(false)
+    }
+  }
+
+  async function loadTargetOptions(search: string) {
+    const requestId = ++targetSearchRequestIdRef.current
+    setTargetOptionsLoading(true)
+    setTargetOptionsError(null)
+
+    const query = search.trim()
+    const params = new URLSearchParams()
+    if (query) {
+      params.set("search", query)
+    }
+    const path = targetType === "GROUP" ? "/whatsapp/groups" : "/whatsapp/contacts"
+    const url = params.size > 0 ? `${path}?${params.toString()}` : path
+
+    try {
+      if (targetSearchRequestIdRef.current !== requestId) {
+        return
+      }
+
+      if (targetType === "GROUP") {
+        const data = await whatsappFetch<WhatsappGroup[]>(url)
+        if (targetSearchRequestIdRef.current !== requestId) {
+          return
+        }
+        setTargetOptions(data.map(mapGroupToTarget))
+      } else {
+        const data = await whatsappFetch<WhatsappContact[]>(url)
+        if (targetSearchRequestIdRef.current !== requestId) {
+          return
+        }
+        setTargetOptions(data.map(mapContactToTarget))
+      }
+    } catch (err) {
+      if (redirectIfUnauthorized(err, () => router.replace("/login"))) return
+      if (targetSearchRequestIdRef.current === requestId) {
+        setTargetOptionsError(err instanceof Error ? err.message : "Não foi possível buscar os destinos.")
+      }
+    } finally {
+      if (targetSearchRequestIdRef.current === requestId) {
+        setTargetOptionsLoading(false)
+      }
+    }
+  }
+
+  async function loadMentionOptions(search: string) {
+    const requestId = ++mentionSearchRequestIdRef.current
+    setMentionOptionsLoading(true)
+    setMentionOptionsError(null)
+
+    const query = search.trim()
+    const params = new URLSearchParams()
+    if (query) {
+      params.set("search", query)
+    }
+    const url = params.size > 0 ? `/whatsapp/contacts?${params.toString()}` : "/whatsapp/contacts"
+
+    try {
+      const data = await whatsappFetch<WhatsappContact[]>(url)
+
+      if (mentionSearchRequestIdRef.current !== requestId) {
+        return
+      }
+
+      setMentionOptions(data)
+    } catch (err) {
+      if (redirectIfUnauthorized(err, () => router.replace("/login"))) return
+      if (mentionSearchRequestIdRef.current === requestId) {
+        setMentionOptionsError(err instanceof Error ? err.message : "Não foi possível buscar contatos para menção.")
+      }
+    } finally {
+      if (mentionSearchRequestIdRef.current === requestId) {
+        setMentionOptionsLoading(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!targetOptionsVisible) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void loadTargetOptions(targetQuery)
+    }, TARGET_SEARCH_DEBOUNCE_MS)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [targetQuery, targetType, targetOptionsVisible])
+
+  useEffect(() => {
+    if (!mentionSearch) {
+      setMentionOptions([])
+      setMentionOptionsLoading(false)
+      setMentionOptionsError(null)
+      return
+    }
+
+    if (targetType !== "GROUP" || !selectedTarget) {
+      setMentionOptions([])
+      setMentionOptionsLoading(false)
+      setMentionOptionsError("Selecione um grupo como destino para usar menções.")
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void loadMentionOptions(mentionSearch.query)
+    }, MENTION_SEARCH_DEBOUNCE_MS)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [mentionSearch, selectedTarget, targetType])
+
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+
+    if (!selectedTarget) {
+      setError("Selecione um destino antes de criar a automação.")
+      return
+    }
+
     setSaving(true)
     setError(null)
+    setStatusMessage(null)
 
     const payload: Record<string, unknown> = {
       title,
       message,
       kind,
-      targetGroupJid: targetGroupJid || undefined
+      targetType,
+      targetJid: selectedTarget.jid
+    }
+    const activeMentions = selectedMentions.filter((contact) => message.includes(contact.mentionToken))
+
+    if (activeMentions.length > 0) {
+      payload.mentionNumbers = activeMentions.map((contact) => contact.phoneNumber)
+    }
+
+    if (imageBase64 && imageMimeType) {
+      payload.imageBase64 = imageBase64
+      payload.imageMimeType = imageMimeType
+      payload.imageFileName = imageFileName || undefined
     }
 
     if (kind === "ONE_SHOT" || kind === "REMINDER") {
@@ -87,7 +403,7 @@ export function WhatsappAutomationsPageClient() {
     }
 
     if (kind === "BIRTHDAY") {
-      payload.monthDay = monthDay
+      payload.monthDay = toBackendMonthDay(birthdayDayMonth)
     }
 
     try {
@@ -98,12 +414,142 @@ export function WhatsappAutomationsPageClient() {
 
       setTitle("")
       setMessage("")
+      setTargetQuery("")
+      setSelectedTarget(null)
+      setSelectedMentions([])
+      setMentionSearch(null)
+      setMentionOptions([])
+      setMentionOptionsError(null)
+      setTargetOptionsVisible(false)
+      clearImage()
       await loadAutomations()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível criar a automação.")
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      clearImage()
+      return
+    }
+
+    if (!WHATSAPP_IMAGE_TYPES.includes(file.type as WhatsappImageMimeType)) {
+      clearImage()
+      setError("Selecione uma imagem JPEG, PNG ou WebP.")
+      return
+    }
+
+    if (file.size > MAX_WHATSAPP_IMAGE_BYTES) {
+      clearImage()
+      setError("A imagem deve ter no máximo 5 MB.")
+      return
+    }
+
+    try {
+      const dataUrl = await fileToDataUrl(file)
+      setImageBase64(dataUrl)
+      setImageMimeType(file.type as WhatsappImageMimeType)
+      setImageFileName(file.name)
+      setError(null)
+    } catch (err) {
+      clearImage()
+      setError(err instanceof Error ? err.message : "Não foi possível carregar a imagem.")
+    }
+  }
+
+  function clearImage() {
+    setImageBase64("")
+    setImageMimeType("")
+    setImageFileName("")
+    if (imageInputRef.current) {
+      imageInputRef.current.value = ""
+    }
+  }
+
+  function updateMentionSearch(value: string, cursor: number) {
+    const activeMention = findActiveMention(value, cursor)
+    setMentionSearch(activeMention)
+    setMentionOptionsError(null)
+
+    if (!activeMention) {
+      return
+    }
+
+    if (targetType !== "GROUP" || !selectedTarget) {
+      setMentionOptions([])
+      setMentionOptionsError("Selecione um grupo como destino para usar menções.")
+      return
+    }
+  }
+
+  function handleMessageChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    const nextMessage = event.target.value
+    setMessage(nextMessage)
+    updateMentionSearch(nextMessage, event.target.selectionStart)
+  }
+
+  function syncMentionSearchFromCursor() {
+    const input = messageInputRef.current
+    if (!input) {
+      return
+    }
+
+    updateMentionSearch(message, input.selectionStart)
+  }
+
+  function selectMention(contact: WhatsappContact) {
+    if (!mentionSearch) {
+      return
+    }
+
+    const mentionToken = buildMentionToken(contact)
+    const mentionText = `${mentionToken} `
+    const nextMessage = `${message.slice(0, mentionSearch.start)}${mentionText}${message.slice(mentionSearch.end)}`
+    const nextCursor = mentionSearch.start + mentionText.length
+
+    setMessage(nextMessage)
+    setSelectedMentions((current) => {
+      if (current.some((item) => item.phoneNumber === contact.phoneNumber)) {
+        return current
+      }
+
+      return [...current, { ...contact, mentionToken }]
+    })
+    setMentionSearch(null)
+    setMentionOptions([])
+    setMentionOptionsError(null)
+
+    window.requestAnimationFrame(() => {
+      messageInputRef.current?.focus()
+      messageInputRef.current?.setSelectionRange(nextCursor, nextCursor)
+    })
+  }
+
+  function handleSelectTarget(option: WhatsappTargetOption) {
+    setSelectedTarget(option)
+    setTargetQuery(option.label)
+    setTargetOptionsError(null)
+    setTargetOptionsVisible(false)
+    setMentionOptions([])
+    setMentionOptionsError(null)
+    setSelectedMentions([])
+    setMentionSearch(null)
+  }
+
+  function handleTargetQueryChange(value: string) {
+    setTargetQuery(value)
+    setTargetOptionsVisible(true)
+    setTargetOptionsError(null)
+    setSelectedTarget(null)
+    setMentionOptions([])
+    setMentionOptionsError(null)
+    setSelectedMentions([])
+    setMentionSearch(null)
   }
 
   async function runNow(id: string) {
@@ -149,23 +595,20 @@ export function WhatsappAutomationsPageClient() {
   }
 
   const canDispatch = connection?.status === "READY"
+  const visibleAutomations = automations.filter(shouldShowAutomation)
+  const mentionSuggestions = mentionOptions.slice(0, MAX_MENTION_SUGGESTIONS)
 
   return (
     <section className="whatsapp-page">
       <header className="whatsapp-page__hero">
         <div>
           <p className="whatsapp-page__eyebrow">Automações</p>
-          <h2 className="whatsapp-page__title">Crie regras para aniversários, lembretes e disparos recorrentes</h2>
-          <p className="whatsapp-page__subtitle">
-            Cada automação grava seu próximo agendamento, última execução e status operacional.
-          </p>
-          <p className="whatsapp-page__hint">
-            Sessão atual: {connection?.status ?? "carregando"}. Disparos manuais exigem sessão READY.
-          </p>
+          <h2 className="whatsapp-page__title">Crie regras automações pro WhatsApp</h2>
         </div>
       </header>
 
       {error && <div className="whatsapp-alert whatsapp-alert--error">{error}</div>}
+      {statusMessage && <div className="whatsapp-alert">{statusMessage}</div>}
 
       <div className="whatsapp-grid">
         <section className="whatsapp-card">
@@ -183,9 +626,135 @@ export function WhatsappAutomationsPageClient() {
             </label>
 
             <label>
-              <span>Mensagem</span>
-              <textarea required value={message} onChange={(event) => setMessage(event.target.value)} rows={5} placeholder="Bom dia, hoje é..." />
+              <span>Tipo de destino</span>
+              <select value={targetType} onChange={(event) => setTargetType(event.target.value as WhatsappAutomationTargetType)}>
+                {TARGET_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
+
+            <div className="whatsapp-group-picker">
+              <label>
+                <span>{targetType === "GROUP" ? "Grupo" : "Contato"}</span>
+                <input
+                  value={targetQuery}
+                  onChange={(event) => handleTargetQueryChange(event.target.value)}
+                  onFocus={() => {
+                    setTargetOptionsVisible(true)
+                    void loadTargetOptions(targetQuery)
+                  }}
+                  placeholder={targetType === "GROUP" ? "Nome do grupo ou JID" : "Nome do contato ou telefone"}
+                />
+              </label>
+
+              {targetType === "GROUP" && (
+                <div className="whatsapp-group-picker__actions">
+                  <button
+                    type="button"
+                    className="whatsapp-button whatsapp-button--ghost"
+                    onClick={() => void syncDirectory()}
+                    disabled={syncingDirectory || targetOptionsLoading || connection?.status !== "READY"}
+                    title={connection?.status !== "READY" ? "Conecte o WhatsApp antes de sincronizar" : undefined}
+                  >
+                    {syncingDirectory ? "Sincronizando..." : "Sincronizar com WhatsApp Web"}
+                  </button>
+                </div>
+              )}
+
+              {selectedTarget && (
+                <p className="whatsapp-form-hint">
+                  Destino selecionado: <strong>{selectedTarget.label}</strong> · {selectedTarget.secondaryLabel}
+                </p>
+              )}
+
+              {targetOptionsError && <p className="whatsapp-form-hint whatsapp-form-hint--error">{targetOptionsError}</p>}
+
+              {targetOptionsVisible && targetOptions.length > 0 && (
+                <ul className="whatsapp-group-list">
+                  {targetOptions.map((option) => (
+                    <li key={option.jid}>
+                      <button
+                        type="button"
+                        className="whatsapp-group-list__item"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => handleSelectTarget(option)}
+                      >
+                        <span className="whatsapp-group-list__name">{option.label}</span>
+                        <span className="whatsapp-group-list__jid">{option.secondaryLabel}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {targetOptionsVisible && !targetOptionsLoading && targetOptions.length === 0 && !targetOptionsError && (
+                <p className="whatsapp-form-hint">Nenhum destino encontrado para a busca atual.</p>
+              )}
+            </div>
+
+            <label>
+              <span>Mensagem</span>
+              <textarea
+                ref={messageInputRef}
+                required
+                value={message}
+                onChange={handleMessageChange}
+                onClick={syncMentionSearchFromCursor}
+                onKeyUp={syncMentionSearchFromCursor}
+                rows={5}
+                placeholder="Bom dia, hoje é... @Maria"
+              />
+            </label>
+
+            {mentionSearch && (
+              <div className="whatsapp-mention-menu">
+                {mentionOptionsLoading ? (
+                  <p>Buscando contatos da agenda...</p>
+                ) : mentionOptionsError ? (
+                  <p>{mentionOptionsError}</p>
+                ) : mentionSuggestions.length === 0 ? (
+                  <p>Nenhum contato encontrado.</p>
+                ) : (
+                  mentionSuggestions.map((contact) => (
+                    <button key={contact.jid} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectMention(contact)}>
+                      <strong>{getMentionOptionLabel(contact)}</strong>
+                      <span>{contact.phoneNumber}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+
+            <div className="whatsapp-file-field">
+              <span>Foto opcional</span>
+              <input
+                ref={imageInputRef}
+                id="whatsapp-automation-image"
+                className="whatsapp-file-field__input"
+                type="file"
+                accept={WHATSAPP_IMAGE_TYPES.join(",")}
+                onChange={(event) => void handleImageChange(event)}
+              />
+              <label className="whatsapp-file-field__button" htmlFor="whatsapp-automation-image">
+                <span>{imageFileName || "Selecionar foto"}</span>
+                <small>JPEG, PNG ou WebP até 5 MB</small>
+              </label>
+            </div>
+
+            {imageBase64 && (
+              <div className="whatsapp-image-preview">
+                <img src={imageBase64} alt="Preview da foto selecionada" />
+                <div>
+                  <strong>{imageFileName}</strong>
+                  <button type="button" className="whatsapp-button whatsapp-button--ghost" onClick={clearImage}>
+                    Remover foto
+                  </button>
+                </div>
+              </div>
+            )}
 
             <label>
               <span>Tipo</span>
@@ -196,11 +765,6 @@ export function WhatsappAutomationsPageClient() {
                   </option>
                 ))}
               </select>
-            </label>
-
-            <label>
-              <span>Grupo alvo</span>
-              <input value={targetGroupJid} onChange={(event) => setTargetGroupJid(event.target.value)} placeholder="Opcional: 120363000000000000@g.us" />
             </label>
 
             {(kind === "ONE_SHOT" || kind === "REMINDER") && (
@@ -233,8 +797,15 @@ export function WhatsappAutomationsPageClient() {
 
             {kind === "BIRTHDAY" && (
               <label>
-                <span>Mês e dia</span>
-                <input required value={monthDay} onChange={(event) => setMonthDay(event.target.value)} placeholder="MM-DD" />
+                <span>Dia e mês</span>
+                <input
+                  required
+                  value={birthdayDayMonth}
+                  onChange={(event) => setBirthdayDayMonth(event.target.value)}
+                  placeholder="DD-MM"
+                  inputMode="numeric"
+                  pattern="\d{2}-\d{2}"
+                />
               </label>
             )}
 
@@ -255,16 +826,22 @@ export function WhatsappAutomationsPageClient() {
           <div className="whatsapp-list whatsapp-list--tall">
             {loading ? (
               <p className="whatsapp-empty">Carregando automações...</p>
-            ) : automations.length === 0 ? (
-              <p className="whatsapp-empty">Nenhuma automação cadastrada ainda.</p>
+            ) : visibleAutomations.length === 0 ? (
+              <p className="whatsapp-empty">Nenhuma automação futura ou recorrente cadastrada.</p>
             ) : (
-              automations.map((automation) => (
+              visibleAutomations.map((automation) => (
                 <article className="whatsapp-list-item" key={automation.id}>
                   <div>
                     <strong>{automation.title}</strong>
                     <p>
                       {automation.kind} · {automation.nextRunAt ? `Próxima execução em ${new Date(automation.nextRunAt).toLocaleString("pt-BR")}` : "Sem agendamento"}
                     </p>
+                    <p>
+                      {automation.targetType ? formatTargetTypeLabel(automation.targetType) : "Sem destino"} · {automation.targetJid ?? "—"}
+                    </p>
+                    {getAutomationEnhancementSummary(automation) && (
+                      <p>{getAutomationEnhancementSummary(automation)}</p>
+                    )}
                   </div>
 
                   <div className="whatsapp-list-item__actions">

@@ -21,6 +21,7 @@
 - `api/`: NestJS + Prisma + PostgreSQL + Redis + WebSocket
 - `api/src/auth`: auth de participante, admin e troca de senha
 - `api/src/admin`: operação administrativa do quiz
+- `api/src/contacts`: agenda interna de contatos e sincronização de participantes
 - `api/src/participant`: ciclo de vida do participante
 - `api/src/quiz`: quiz ativo e perguntas
 - `api/src/ranking`: placar final
@@ -32,6 +33,7 @@
 - `client/app`: rotas e páginas
 - `client/components`: componentes reutilizáveis
 - `client/lib`: fetch, sessão e utilitários
+- `client/app/contacts`: portal interno de contatos
 - `client/app/globals.css`: estilos globais
 
 ## Fontes principais

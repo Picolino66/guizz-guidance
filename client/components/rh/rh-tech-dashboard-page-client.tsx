@@ -32,24 +32,24 @@ export function RhTechDashboardPageClient() {
       <div className="rh-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{i.candidate.name}</div>
-            <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{i.jobPosition.titulo} · {i.jobPosition.nivel}</div>
+            <div className="rh-item__name">{i.candidate.name}</div>
+            <div className="rh-item__meta">{i.jobPosition.titulo} · {i.jobPosition.nivel}</div>
           </div>
           <span className={`rh-badge ${STATUS_COLORS[i.status]}`}>{STATUS_LABELS[i.status]}</span>
         </div>
 
         {i.confirmedSlot && (
-          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "8px 12px" }}>
-            <div style={{ fontSize: 12, color: "#15803d", fontWeight: 600 }}>Data confirmada</div>
-            <div style={{ fontSize: 14, color: "#166534", marginTop: 2 }}>{formatDT(i.confirmedSlot.startAt)}</div>
+          <div className="rh-info-block rh-info-block--success">
+            <div className="rh-info-block__label">Data confirmada</div>
+            <div className="rh-info-block__value">{formatDT(i.confirmedSlot.startAt)}</div>
           </div>
         )}
 
         {i.status === "WAITING_TECH_CONFIRMATION" && i.slots.length > 0 && (
-          <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 12px" }}>
-            <div style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 600, marginBottom: 4 }}>Datas aguardando confirmação</div>
+          <div className="rh-info-block rh-info-block--info">
+            <div className="rh-info-block__label">Datas aguardando confirmação</div>
             {i.slots.filter((s) => s.status === "PROPOSED").map((s) => (
-              <div key={s.id} style={{ fontSize: 13, color: "#1e40af" }}>{formatDT(s.startAt)}</div>
+              <div key={s.id} className="rh-info-block__value">{formatDT(s.startAt)}</div>
             ))}
           </div>
         )}
@@ -57,7 +57,7 @@ export function RhTechDashboardPageClient() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {i.jobPosition.stackTags.slice(0, 3).map((t) => (
-              <span key={t} className="rh-badge" style={{ background: "#f1f5f9", color: "#475569", fontSize: 11 }}>{t}</span>
+              <span key={t} className="rh-badge rh-badge--neutral-soft" style={{ fontSize: 11 }}>{t}</span>
             ))}
           </div>
           <Link href={`/rh/tech/interviews/${i.id}`} className="rh-btn rh-btn--primary rh-btn--sm">
@@ -85,9 +85,7 @@ export function RhTechDashboardPageClient() {
         <>
           {pending.length > 0 && (
             <div style={{ marginBottom: 28 }}>
-              <h2 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Aguardando sua confirmação ({pending.length})
-              </h2>
+              <h2 className="rh-section__heading">Aguardando sua confirmação ({pending.length})</h2>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
                 {pending.map((i) => <InterviewCard key={i.id} i={i} />)}
               </div>
@@ -96,9 +94,7 @@ export function RhTechDashboardPageClient() {
 
           {upcoming.length > 0 && (
             <div style={{ marginBottom: 28 }}>
-              <h2 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Agendadas ({upcoming.length})
-              </h2>
+              <h2 className="rh-section__heading">Agendadas ({upcoming.length})</h2>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
                 {upcoming.map((i) => <InterviewCard key={i.id} i={i} />)}
               </div>
@@ -107,9 +103,7 @@ export function RhTechDashboardPageClient() {
 
           {others.length > 0 && (
             <div>
-              <h2 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Outras ({others.length})
-              </h2>
+              <h2 className="rh-section__heading">Outras ({others.length})</h2>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
                 {others.map((i) => <InterviewCard key={i.id} i={i} />)}
               </div>

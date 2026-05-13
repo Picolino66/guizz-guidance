@@ -30,6 +30,10 @@ export class AdminAuthGuard implements CanActivate {
         secret: this.configService.getOrThrow<string>("JWT_SECRET")
       });
 
+      if (payload.role !== "ADMIN" && payload.role !== "USER") {
+        throw new ForbiddenException("Acesso restrito a usuários internos.");
+      }
+
       request.user = payload;
       return true;
     } catch (error) {

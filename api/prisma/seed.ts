@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcrypt";
+import { buildSearchText } from "../src/common/utils/search-text"
 
 const prisma = new PrismaClient();
 
@@ -105,6 +106,14 @@ async function main() {
 
   await prisma.allowedEmail.createMany({
     data: allowedEmails.map((email) => ({ email })),
+    skipDuplicates: true
+  })
+
+  await prisma.contact.createMany({
+    data: allowedEmails.map((email) => ({
+      email,
+      searchText: buildSearchText([email])
+    })),
     skipDuplicates: true
   })
 /*

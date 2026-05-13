@@ -120,7 +120,7 @@ export function RhCandidatesPageClient() {
                   <tr key={c.id}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{c.name}</div>
-                      {c.linkedinUrl && <a href={c.linkedinUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0ea5e9" }}>LinkedIn</a>}
+                      {c.linkedinUrl && <a href={c.linkedinUrl} target="_blank" rel="noreferrer" className="rh-link--colored">LinkedIn</a>}
                     </td>
                     <td>{c.pretensaoSenioridade || "—"}</td>
                     <td>{c.cidadeEstado}</td>

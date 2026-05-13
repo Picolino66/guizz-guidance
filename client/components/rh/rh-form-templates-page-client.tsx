@@ -72,7 +72,7 @@ function TemplateEditorModal({ template, onClose, onSave }: {
       <div className="rh-modal" style={{ maxWidth: 680 }} onClick={(e) => e.stopPropagation()}>
         <h2 className="rh-modal__title">{template ? "Editar Template" : "Novo Template"}</h2>
         {template?.isLocked && (
-          <div style={{ background: "#fef3c7", color: "#92400e", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+          <div className="rh-warning-banner">
             Este template está em uso. Editar criará uma nova versão.
           </div>
         )}
@@ -89,15 +89,15 @@ function TemplateEditorModal({ template, onClose, onSave }: {
           </div>
 
           {questions.length === 0 && (
-            <div style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", padding: "24px 0" }}>
+            <div className="rh-field__muted" style={{ textAlign: "center", padding: "24px 0", fontSize: 14 }}>
               Nenhuma pergunta adicionada.
             </div>
           )}
 
           {questions.map((q, i) => (
-            <div key={i} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 16, marginBottom: 10 }}>
+            <div key={i} className="rh-question-item">
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>Pergunta {i + 1}</span>
+                <span className="rh-field__muted">Pergunta {i + 1}</span>
                 <button className="rh-btn rh-btn--danger rh-btn--sm" onClick={() => removeQ(i)}>Remover</button>
               </div>
               <div className="rh-form-group">
@@ -115,7 +115,7 @@ function TemplateEditorModal({ template, onClose, onSave }: {
                   <label className="rh-label">Obrigatória</label>
                   <div style={{ display: "flex", alignItems: "center", height: 42 }}>
                     <input type="checkbox" checked={q.required} onChange={(e) => updateQ(i, "required", e.target.checked)} style={{ width: 18, height: 18, cursor: "pointer" }} />
-                    <span style={{ fontSize: 14, color: "#334155", marginLeft: 8 }}>Sim</span>
+                    <span style={{ fontSize: 14, color: "var(--color-text)", marginLeft: 8 }}>Sim</span>
                   </div>
                 </div>
               </div>
@@ -179,24 +179,24 @@ export function RhFormTemplatesPageClient() {
             <div key={t.id} className="rh-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{t.name}</div>
-                  <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>v{t.version} · {t.questions.length} pergunta{t.questions.length !== 1 ? "s" : ""}</div>
+                  <div className="rh-item__name" style={{ fontSize: 16 }}>{t.name}</div>
+                  <div className="rh-item__meta">v{t.version} · {t.questions.length} pergunta{t.questions.length !== 1 ? "s" : ""}</div>
                 </div>
                 {t.isLocked && (
-                  <span className="rh-badge" style={{ background: "#fef3c7", color: "#92400e", fontSize: 11 }}>Em uso</span>
+                  <span className="rh-badge rh-badge--warning-soft" style={{ fontSize: 11 }}>Em uso</span>
                 )}
               </div>
               <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
                 {t.questions.slice(0, 3).map((q) => (
-                  <div key={q.id} style={{ fontSize: 13, color: "#475569", display: "flex", gap: 8, alignItems: "center" }}>
-                    <span className="rh-badge" style={{ background: "#f1f5f9", color: "#64748b", fontSize: 11, flexShrink: 0 }}>
+                  <div key={q.id} className="rh-field__muted" style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+                    <span className="rh-badge rh-badge--neutral-soft" style={{ fontSize: 11, flexShrink: 0 }}>
                       {QUESTION_TYPES.find((qt) => qt.value === q.type)?.label ?? q.type}
                     </span>
                     {q.label}
                   </div>
                 ))}
                 {t.questions.length > 3 && (
-                  <div style={{ fontSize: 12, color: "#94a3b8" }}>+{t.questions.length - 3} mais...</div>
+                  <div className="rh-field__muted">+{t.questions.length - 3} mais...</div>
                 )}
               </div>
               <div style={{ marginTop: 16, display: "flex", gap: 8 }}>

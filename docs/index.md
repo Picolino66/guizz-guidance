@@ -4,7 +4,7 @@
 Aplicacao de quiz em monorepo com tres superficies principais:
 
 - `api/`: backend NestJS com Prisma, PostgreSQL, Redis e WebSocket
-- `client/`: frontend Next.js App Router com telas publicas, painel admin, portal RH e portal WhatsApp
+- `client/`: frontend Next.js App Router com telas publicas, painel admin, portal RH, portal WhatsApp e agenda interna de contatos
 
 ## Como navegar
 1. Leia primeiro os indices dos modulos.
