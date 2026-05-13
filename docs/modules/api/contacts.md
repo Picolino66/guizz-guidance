@@ -18,7 +18,7 @@ Dominio administrativo para listar e complementar a agenda interna de contatos u
 ## Saida
 - Lista paginada de contatos salvos com `items`, `page`, `pageSize`, `total` e `totalPages`
 - Persistencia de novos contatos ou complemento de contatos ja existentes
-- Atualizacao inline de `name`, `email` e `phoneNumber`
+- Atualizacao inline de `name`, `company`, `email` e `phoneNumber`
 - Base normalizada de busca persistida em `searchText`
 
 ## Dependencias
@@ -31,11 +31,11 @@ Dominio administrativo para listar e complementar a agenda interna de contatos u
 - A rota usa a mesma sessao interna de Home, Quizz, RH e WhatsApp.
 - O seed popula `Contact` com todos os e-mails presentes em `allowedEmails`.
 - `GET /contacts` aceita busca textual e paginacao server-side.
-- `POST /contacts` aceita `name`, `email` e `phoneNumber` como opcionais.
-- `PATCH /contacts/:id` permite limpar ou alterar `name`, `email` e `phoneNumber` no proprio contato.
+- `POST /contacts` aceita `name`, `company`, `email` e `phoneNumber` como opcionais.
+- `PATCH /contacts/:id` permite limpar ou alterar `name`, `company`, `email` e `phoneNumber` no proprio contato.
 - `email`, quando enviado, e normalizado para lowercase.
 - `phoneNumber`, quando enviado, e salvo no formato `55 + DDD + numero com 8 digitos`.
-- `searchText` e recalculado automaticamente a partir de nome, e-mail e telefone normalizado.
+- `searchText` e recalculado automaticamente a partir de nome, empresa, e-mail e telefone normalizado.
 - Caracteres nao numericos como `(`, `)`, espaco, `-` e `+` sao descartados antes da validacao.
 - Se o telefone vier com nono digito local, o backend remove o `9` inicial antes de persistir.
 - Se `email` ou `phoneNumber` ja existir, o cadastro vira complemento do contato existente em vez de duplicacao.
@@ -46,7 +46,7 @@ Dominio administrativo para listar e complementar a agenda interna de contatos u
 ## Fluxo resumido
 1. O usuario interno acessa a tela `/contacts`.
 2. A tela lista a base atual gerada previamente pelo seed.
-3. A tela permite salvar nome, e-mail e telefone.
+3. A tela permite salvar nome, empresa, e-mail e telefone.
 4. A propria listagem permite editar os campos inline e navegar entre paginas.
 5. Quando houver telefone, o valor pode ser usado diretamente em links `wa.me`.
 

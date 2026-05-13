@@ -92,6 +92,7 @@ function makeContact(overrides: Partial<Contact> = {}): Contact {
   return {
     id: "contact-1",
     name: "Maria Silva",
+    company: null,
     email: "maria@guidance.dev",
     phoneNumber: "5511999999999",
     searchText: "maria silva maria@guidance.dev 5511999999999",

@@ -10,6 +10,7 @@ import { useRequireInternalSession } from "../../lib/internal-session"
 
 type ContactFormState = {
   name: string
+  company: string
   email: string
   phoneNumber: string
 }
@@ -18,6 +19,7 @@ const PAGE_SIZE = 10
 
 const INITIAL_FORM: ContactFormState = {
   name: "",
+  company: "",
   email: "",
   phoneNumber: ""
 }
@@ -120,6 +122,7 @@ export function ContactsPageClient() {
     setEditingContactId(contact.id)
     setEditingForm({
       name: contact.name ?? "",
+      company: contact.company ?? "",
       email: contact.email ?? "",
       phoneNumber: contact.phoneNumber ?? ""
     })
@@ -233,6 +236,15 @@ export function ContactsPageClient() {
                         </label>
 
                         <label className="ui-field">
+                          <span>Empresa</span>
+                          <input
+                            className="ui-input"
+                            onChange={(event) => setEditingForm((current) => ({ ...current, company: event.target.value }))}
+                            value={editingForm.company}
+                          />
+                        </label>
+
+                        <label className="ui-field">
                           <span>Telefone</span>
                           <input
                             className="ui-input"
@@ -260,6 +272,7 @@ export function ContactsPageClient() {
                       <>
                         <div className="contacts-list__main">
                           <strong>{contact.name ?? contact.email ?? contact.phoneNumber ?? "Contato sem identificação"}</strong>
+                          <p>{contact.company ?? "Sem empresa"}</p>
                           <p>{contact.email ?? "Sem e-mail"}</p>
                         </div>
 
@@ -344,6 +357,16 @@ export function ContactsPageClient() {
                   onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
                   placeholder="Ex.: maria@guidance.dev"
                   value={form.email}
+                />
+              </label>
+
+              <label className="ui-field">
+                <span>Empresa</span>
+                <input
+                  className="ui-input"
+                  onChange={(event) => setForm((current) => ({ ...current, company: event.target.value }))}
+                  placeholder="Ex.: Guidance"
+                  value={form.company}
                 />
               </label>
 

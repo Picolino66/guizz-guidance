@@ -22,6 +22,11 @@ export class CreateContactDto {
 
   @IsOptional()
   @Transform(({ value }) => normalizeOptionalString(value))
+  @IsString()
+  company?: string
+
+  @IsOptional()
+  @Transform(({ value }) => normalizeOptionalString(value))
   @IsEmail()
   email?: string
 

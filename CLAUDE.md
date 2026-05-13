@@ -12,6 +12,15 @@
   - Client: `docs/modules/client/index.md`
 - Usar docs + `api/prisma/schema.prisma` como mapa/fonte de verdade para rotas, fluxos, contratos e dados.
 
+## Execução de comandos
+- Antes de executar comandos que possam alterar comportamento, estado, banco, arquivos gerados, cache, ambiente ou apagar dados, informar ao usuário:
+  - qual comando será executado
+  - por que ele é necessário
+  - quais são os riscos ou impactos esperados
+  - se pode prosseguir com a execução
+- Exemplos de atenção: migrations, seeds, resets, scripts de sync, remoção de arquivos, limpeza de cache, builds que sobrescrevem artefatos, installs e comandos Docker com efeito persistente.
+- Se o comando for apenas leitura ou validação sem efeito colateral relevante, seguir normalmente.
+
 ## Roteamento por skill
 - `api/` -> `nest-api-specialist`
 - `client/` -> `senior-nextjs-frontend-specialist`
@@ -21,6 +30,7 @@
 - `api/`: NestJS + Prisma + PostgreSQL + Redis + WebSocket
 - `api/src/auth`: auth de participante, admin e troca de senha
 - `api/src/admin`: operação administrativa do quiz
+- `api/src/contacts`: agenda interna de contatos e sincronização de participantes
 - `api/src/participant`: ciclo de vida do participante
 - `api/src/quiz`: quiz ativo e perguntas
 - `api/src/ranking`: placar final
@@ -32,6 +42,7 @@
 - `client/app`: rotas e páginas
 - `client/components`: componentes reutilizáveis
 - `client/lib`: fetch, sessão e utilitários
+- `client/app/contacts`: portal interno de contatos
 - `client/app/globals.css`: estilos globais
 
 ## Fontes principais
@@ -62,6 +73,7 @@
 - Antes de PR: `npm run lint` no pacote alterado e `npm run build` quando houver mudança de código.
 - Se tocar API e client, validar os dois lados.
 - Registrar verificação manual curta na entrega/PR.
+- No fim de qualquer pedido, informar ao usuário todo comando manual que ainda precise ser executado, explicando por que ele é necessário e o que ele aplica/atualiza.
 
 ## Docs e manutenção
 - Mudou fluxo, contrato, rota, modelo, componente, tela, script ou arquitetura: atualizar docs relacionados.

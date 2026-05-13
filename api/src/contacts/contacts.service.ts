@@ -59,10 +59,12 @@ export class ContactsService {
       where: { id: existingContact.id },
       data: {
         name: data.name ?? existingContact.name,
+        company: data.company ?? existingContact.company,
         email: data.email ?? existingContact.email,
         phoneNumber: data.phoneNumber ?? existingContact.phoneNumber,
         searchText: this.buildContactSearchText({
           name: data.name ?? existingContact.name,
+          company: data.company ?? existingContact.company,
           email: data.email ?? existingContact.email,
           phoneNumber: data.phoneNumber ?? existingContact.phoneNumber
         })
@@ -99,6 +101,7 @@ export class ContactsService {
       where: { id },
       data: {
         name: data.name,
+        company: data.company,
         email: data.email,
         phoneNumber: data.phoneNumber,
         searchText: this.buildContactSearchText(data)
@@ -108,15 +111,18 @@ export class ContactsService {
 
   private normalizeContactInput(dto: CreateContactDto): Prisma.ContactUncheckedCreateInput {
     const name = this.normalizeOptionalString(dto.name)
+    const company = this.normalizeOptionalString(dto.company)
     const email = this.normalizeOptionalEmail(dto.email)
     const phoneNumber = this.normalizeOptionalPhoneNumber(dto.phoneNumber)
 
     return {
       name,
+      company,
       email,
       phoneNumber,
       searchText: this.buildContactSearchText({
         name,
+        company,
         email,
         phoneNumber
       })
@@ -183,11 +189,13 @@ export class ContactsService {
 
   private buildContactSearchText(input: {
     name?: string | null
+    company?: string | null
     email?: string | null
     phoneNumber?: string | null
   }) {
     return buildSearchText([
       input.name,
+      input.company,
       input.email,
       input.phoneNumber ? input.phoneNumber.replace(/\D/g, "") : null
     ])

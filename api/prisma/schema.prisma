@@ -34,6 +34,7 @@ model AllowedEmail {
 model Contact {
   id          String   @id @default(cuid())
   name        String?
+  company     String?
   email       String?  @unique
   phoneNumber String?  @unique
   searchText  String   @default("")

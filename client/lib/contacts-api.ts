@@ -4,6 +4,7 @@ import { getAdminToken } from "./session"
 export interface Contact {
   id: string
   name: string | null
+  company: string | null
   email: string | null
   phoneNumber: string | null
   createdAt: string
