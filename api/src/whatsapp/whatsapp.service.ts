@@ -115,10 +115,12 @@ export interface WhatsappAutomationView {
 export interface WhatsappDispatchLogView {
   id: string
   automationId: string | null
+  automationTitle: string | null
   connectionId: string
   dispatchKey: string
   targetType: WhatsappAutomationTargetType
   targetJid: string
+  targetName: string
   message: string
   status: WhatsappDispatchStatus
   attempts: number
@@ -129,6 +131,18 @@ export interface WhatsappDispatchLogView {
   metadata: Prisma.JsonValue | null
   createdAt: string
   updatedAt: string
+}
+
+export interface WhatsappDispatchLogsPageView {
+  items: WhatsappDispatchLogView[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasPreviousPage: boolean
+    hasNextPage: boolean
+  }
 }
 
 export interface WhatsappGroupParticipantView {
@@ -316,17 +330,99 @@ export class WhatsappService implements OnModuleInit {
 
   async listLogs(query: ListWhatsappLogsDto) {
     const connection = await this.ensurePrimaryConnection()
-    const rows = await this.prisma.whatsappDispatchLog.findMany({
-      where: {
-        connectionId: connection.id,
-        ...(query.status ? { status: query.status } : {}),
-        ...(query.automationId ? { automationId: query.automationId } : {})
-      },
-      orderBy: { createdAt: "desc" },
-      take: query.limit ?? 20
-    })
+    const page = query.page ?? 1
+    const limit = query.limit ?? 20
+    const where = {
+      connectionId: connection.id,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.automationId ? { automationId: query.automationId } : {})
+    }
+    const [total, rows] = await Promise.all([
+      this.prisma.whatsappDispatchLog.count({ where }),
+      this.prisma.whatsappDispatchLog.findMany({
+        where,
+        include: {
+          automation: {
+            select: {
+              title: true
+            }
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit
+      })
+    ])
+    const groupJids = new Set<string>()
+    const contactPhoneNumbers = new Set<string>()
 
-    return rows.map((log) => this.toLogView(log))
+    for (const row of rows) {
+      if (row.targetType === WhatsappAutomationTargetType.GROUP) {
+        groupJids.add(row.targetJid)
+        continue
+      }
+
+      const phoneNumber = this.extractPhoneNumberFromContactJid(row.targetJid)
+
+      if (phoneNumber) {
+        contactPhoneNumbers.add(phoneNumber)
+      }
+    }
+
+    const [groups, contacts] = await Promise.all([
+      groupJids.size > 0
+        ? this.prisma.whatsappGroup.findMany({
+            where: {
+              connectionId: connection.id,
+              jid: {
+                in: [...groupJids]
+              }
+            },
+            select: {
+              jid: true,
+              name: true
+            }
+          })
+        : Promise.resolve([]),
+      contactPhoneNumbers.size > 0
+        ? this.prisma.contact.findMany({
+            where: {
+              phoneNumber: {
+                in: [...contactPhoneNumbers]
+              }
+            },
+            select: {
+              phoneNumber: true,
+              name: true
+            }
+          })
+        : Promise.resolve([])
+    ])
+    const groupNameByJid = new Map(groups.map((group) => [group.jid, group.name.trim() || "Grupo sem nome"]))
+    const contactNameByPhoneNumber = new Map(
+      contacts.map((contact) => [contact.phoneNumber ?? "", contact.name?.trim() || contact.phoneNumber || "Contato sem nome"])
+    )
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit)
+
+    return {
+      items: rows.map((log) =>
+        this.toLogView(log, {
+          automationTitle: log.automation?.title?.trim() || null,
+          targetName:
+            log.targetType === WhatsappAutomationTargetType.GROUP
+              ? groupNameByJid.get(log.targetJid) ?? "Grupo não encontrado"
+              : contactNameByPhoneNumber.get(this.extractPhoneNumberFromContactJid(log.targetJid) ?? "") ?? "Contato não encontrado"
+        })
+      ),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasPreviousPage: page > 1,
+        hasNextPage: page < totalPages
+      }
+    }
   }
 
   async createAutomation(dto: CreateWhatsappAutomationDto) {
@@ -1329,14 +1425,40 @@ export class WhatsappService implements OnModuleInit {
     }
   }
 
-  private toLogView(log: WhatsappDispatchLog): WhatsappDispatchLogView {
+  private toLogView(
+    log: Pick<
+      WhatsappDispatchLog,
+      | "id"
+      | "automationId"
+      | "connectionId"
+      | "dispatchKey"
+      | "targetType"
+      | "targetJid"
+      | "message"
+      | "status"
+      | "attempts"
+      | "errorMessage"
+      | "sentAt"
+      | "scheduledFor"
+      | "triggeredBy"
+      | "metadata"
+      | "createdAt"
+      | "updatedAt"
+    >,
+    details?: {
+      automationTitle?: string | null
+      targetName?: string | null
+    }
+  ): WhatsappDispatchLogView {
     return {
       id: log.id,
       automationId: log.automationId,
+      automationTitle: details?.automationTitle ?? null,
       connectionId: log.connectionId,
       dispatchKey: log.dispatchKey,
       targetType: log.targetType,
       targetJid: log.targetJid,
+      targetName: details?.targetName?.trim() || (log.targetType === WhatsappAutomationTargetType.GROUP ? "Grupo não encontrado" : "Contato não encontrado"),
       message: log.message,
       status: log.status,
       attempts: log.attempts,

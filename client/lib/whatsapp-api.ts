@@ -54,10 +54,12 @@ export interface WhatsappAutomation {
 export interface WhatsappDispatchLog {
   id: string
   automationId: string | null
+  automationTitle: string | null
   connectionId: string
   dispatchKey: string
   targetType: WhatsappAutomationTargetType
   targetJid: string
+  targetName: string
   message: string
   status: WhatsappDispatchStatus
   attempts: number
@@ -68,6 +70,18 @@ export interface WhatsappDispatchLog {
   metadata: unknown
   createdAt: string
   updatedAt: string
+}
+
+export interface WhatsappDispatchLogsPage {
+  items: WhatsappDispatchLog[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasPreviousPage: boolean
+    hasNextPage: boolean
+  }
 }
 
 export interface WhatsappOverview {

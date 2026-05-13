@@ -4,6 +4,12 @@ import { WhatsappDispatchStatus } from "@prisma/client"
 
 export class ListWhatsappLogsDto {
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number
+
+  @IsOptional()
   @IsEnum(WhatsappDispatchStatus)
   status?: WhatsappDispatchStatus
 

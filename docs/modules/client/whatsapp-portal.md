@@ -55,7 +55,7 @@ Area administrativa para operar a conexao WhatsApp, automacoes, logs e status da
 - A lista de automacoes mostra apenas regras com disparo futuro (`nextRunAt`) ou regras periodicas.
 - A lista de automacoes mostra um resumo discreto quando a regra tem foto ou mencoes.
 - Os labels visiveis do portal WhatsApp, incluindo status, tipos, acoes e gatilhos de execucao, devem aparecer em portugues.
-- A pagina de logs filtra eventos por status e quantidade.
+- A pagina de logs filtra eventos por status e quantidade, usa paginação por página/limite e exibe nome do destino e titulo da automacao no lugar do JID bruto.
 - A pagina de conexao ouve `whatsapp_session_updated` e mantem polling enquanto a sessao esta conectando ou aguardando QR.
 - Disparos manuais ficam bloqueados ate a sessao estar `READY`.
 

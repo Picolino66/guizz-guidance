@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { redirectIfUnauthorized } from "../../lib/api"
-import { whatsappFetch, type WhatsappDispatchLog, type WhatsappDispatchStatus } from "../../lib/whatsapp-api"
+import { whatsappFetch, type WhatsappDispatchLog, type WhatsappDispatchLogsPage, type WhatsappDispatchStatus } from "../../lib/whatsapp-api"
 import { formatWhatsappTriggerLabel, whatsappDispatchStatusLabels } from "./whatsapp-labels"
 
 const STATUS_OPTIONS: Array<{ value: WhatsappDispatchStatus | ""; label: string }> = [
@@ -18,8 +18,17 @@ const STATUS_OPTIONS: Array<{ value: WhatsappDispatchStatus | ""; label: string 
 export function WhatsappLogsPageClient() {
   const router = useRouter()
   const [logs, setLogs] = useState<WhatsappDispatchLog[]>([])
+  const [page, setPage] = useState(1)
   const [status, setStatus] = useState<WhatsappDispatchStatus | "">("")
   const [limit, setLimit] = useState(20)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+    hasPreviousPage: false,
+    hasNextPage: false
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,10 +38,12 @@ export function WhatsappLogsPageClient() {
     try {
       const query = new URLSearchParams()
       if (status) query.set("status", status)
+      query.set("page", String(page))
       query.set("limit", String(limit))
 
-      const data = await whatsappFetch<WhatsappDispatchLog[]>(`/whatsapp/logs?${query.toString()}`)
-      setLogs(data)
+      const data = await whatsappFetch<WhatsappDispatchLogsPage>(`/whatsapp/logs?${query.toString()}`)
+      setLogs(data.items)
+      setPagination(data.pagination)
     } catch (err) {
       if (redirectIfUnauthorized(err, () => router.replace("/login"))) return
       setError(err instanceof Error ? err.message : "Não foi possível carregar os logs.")
@@ -43,7 +54,7 @@ export function WhatsappLogsPageClient() {
 
   useEffect(() => {
     void loadLogs()
-  }, [status, limit])
+  }, [status, limit, page])
 
   return (
     <section className="whatsapp-page">
@@ -59,7 +70,13 @@ export function WhatsappLogsPageClient() {
       <div className="whatsapp-card whatsapp-card--toolbar">
         <label>
           <span>Status</span>
-          <select value={status} onChange={(event) => setStatus(event.target.value as WhatsappDispatchStatus | "")}>
+          <select
+            value={status}
+            onChange={(event) => {
+              setStatus(event.target.value as WhatsappDispatchStatus | "")
+              setPage(1)
+            }}
+          >
             {STATUS_OPTIONS.map((option) => (
               <option key={option.label} value={option.value}>
                 {option.label}
@@ -70,7 +87,13 @@ export function WhatsappLogsPageClient() {
 
         <label>
           <span>Limite</span>
-          <select value={limit} onChange={(event) => setLimit(Number(event.target.value))}>
+          <select
+            value={limit}
+            onChange={(event) => {
+              setLimit(Number(event.target.value))
+              setPage(1)
+            }}
+          >
             {[10, 20, 50, 100].map((value) => (
               <option key={value} value={value}>
                 {value}
@@ -94,9 +117,9 @@ export function WhatsappLogsPageClient() {
             logs.map((log) => (
               <article className="whatsapp-list-item" key={log.id}>
                 <div>
-                  <strong>{log.targetType === "GROUP" ? "Grupo" : "Contato"}</strong>
+                  <strong>{log.targetName}</strong>
                   <p>
-                    {log.targetJid} · {whatsappDispatchStatusLabels[log.status]} · {log.createdAt ? new Date(log.createdAt).toLocaleString("pt-BR") : "—"} · {formatWhatsappTriggerLabel(log.triggeredBy)}
+                    {log.automationTitle ?? "Teste manual"} · {log.targetType === "GROUP" ? "Grupo" : "Contato"} · {whatsappDispatchStatusLabels[log.status]} · {log.createdAt ? new Date(log.createdAt).toLocaleString("pt-BR") : "—"} · {formatWhatsappTriggerLabel(log.triggeredBy)}
                   </p>
                 </div>
 
@@ -107,6 +130,31 @@ export function WhatsappLogsPageClient() {
               </article>
             ))
           )}
+        </div>
+
+        <div className="whatsapp-pagination">
+          <p className="whatsapp-muted">
+            {pagination.total === 0
+              ? "Nenhum log encontrado."
+              : `Página ${pagination.page} de ${pagination.totalPages} · ${pagination.total} registro${pagination.total === 1 ? "" : "s"}`}
+          </p>
+
+          <div className="whatsapp-list-item__actions">
+            <button
+              className="whatsapp-button whatsapp-button--ghost"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={loading || !pagination.hasPreviousPage}
+            >
+              Anterior
+            </button>
+            <button
+              className="whatsapp-button whatsapp-button--ghost"
+              onClick={() => setPage((current) => current + 1)}
+              disabled={loading || !pagination.hasNextPage}
+            >
+              Próxima
+            </button>
+          </div>
         </div>
       </section>
     </section>

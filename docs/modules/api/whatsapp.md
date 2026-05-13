@@ -22,6 +22,7 @@ Dominio administrativo para conectar uma sessao WhatsApp, cadastrar automacoes, 
 - `POST /whatsapp/automations/:id/run-now`
 - `DELETE /whatsapp/automations/:id`
 - `GET /whatsapp/logs`
+- `GET /whatsapp/logs?page=...&limit=...`
 - `POST /whatsapp/test-message`
 - `GET /whatsapp/groups?search=...`
 - `GET /whatsapp/contacts?search=...`
@@ -33,6 +34,7 @@ Dominio administrativo para conectar uma sessao WhatsApp, cadastrar automacoes, 
 - Status operacional da conexão
 - Lista, criacao, atualizacao e exclusao de automacoes
 - Logs de execucao e falha
+- Logs paginados de execucao e falha, com nome resolvido do destino e titulo da automacao quando houver
 - Disparo manual de teste
 - Mensagens WhatsApp com texto, foto opcional e mencoes manuais
 - Destino explicito por automacao com `targetType` (`GROUP` ou `CONTACT`), `targetJid` e suporte a `targetJids` para contato multiplo
@@ -62,6 +64,7 @@ Dominio administrativo para conectar uma sessao WhatsApp, cadastrar automacoes, 
 - Menções podem vir de `mentionNumbers` ou de marcacoes `@numero` dentro de `message`; o backend normaliza para `${digits}@s.whatsapp.net` e remove duplicados.
 - `GET /whatsapp/groups` le o catalogo persistido no banco, aceita `search` opcional e nao depende de sessao `READY`.
 - `GET /whatsapp/contacts` le a agenda interna `Contact`, aceita `search` opcional e retorna apenas registros com telefone, convertendo o numero salvo para `jid = ${phoneNumber}@s.whatsapp.net`.
+- `GET /whatsapp/logs` aceita `page` e `limit`, pagina por `createdAt desc` e devolve `items` com `targetName` e `automationTitle`, alem do bloco `pagination`.
 - Durante o disparo de automacoes com destino `CONTACT`, o backend usa `targetJids` para fazer fan-out e enviar uma mensagem separada para cada contato.
 - Durante o disparo de automacoes com destino `CONTACT`, o placeholder `[nome]` no campo `message` e substituido pelo nome salvo do contato correspondente a cada destinatario.
 - `POST /whatsapp/sync` exige sessao `READY`, força um `resyncAppState` da sessao e faz upsert dos grupos no banco.
