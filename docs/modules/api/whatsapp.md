@@ -62,6 +62,7 @@ Dominio administrativo para conectar uma sessao WhatsApp, cadastrar automacoes, 
 - Menções podem vir de `mentionNumbers` ou de marcacoes `@numero` dentro de `message`; o backend normaliza para `${digits}@s.whatsapp.net` e remove duplicados.
 - `GET /whatsapp/groups` le o catalogo persistido no banco, aceita `search` opcional e nao depende de sessao `READY`.
 - `GET /whatsapp/contacts` le a agenda interna `Contact`, aceita `search` opcional e retorna apenas registros com telefone, convertendo o numero salvo para `jid = ${phoneNumber}@s.whatsapp.net`.
+- Durante o disparo de automacoes com destino `CONTACT`, o placeholder `[nome]` no campo `message` e substituido pelo nome salvo do contato correspondente ao `targetJid`.
 - `POST /whatsapp/sync` exige sessao `READY`, força um `resyncAppState` da sessao e faz upsert dos grupos no banco.
 - Grupos que sumirem em sincronizacoes futuras permanecem salvos, mas ficam com `isAvailable = false` e saem do autocomplete.
 - A busca de grupos e contatos usa campos persistidos `searchText`, sem diferenciar acentos, maiusculas e minusculas.

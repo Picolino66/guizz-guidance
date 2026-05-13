@@ -709,6 +709,12 @@ export function WhatsappAutomationsPageClient() {
               />
             </label>
 
+            {targetType === "CONTACT" && (
+              <p className="whatsapp-form-hint">
+                Use <strong>[nome]</strong> para inserir automaticamente o nome salvo do contato selecionado.
+              </p>
+            )}
+
             {mentionSearch && (
               <div className="whatsapp-mention-menu">
                 {mentionOptionsLoading ? (

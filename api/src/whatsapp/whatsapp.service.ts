@@ -43,6 +43,7 @@ const WHATSAPP_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/web
 const WHATSAPP_IMAGE_DATA_URL_PATTERN = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/i
 const WHATSAPP_VISUAL_MENTION_PATTERN = /(?:^|[^\w])@(\d{8,15})(?!\w)/g
 const WHATSAPP_ANY_VISUAL_MENTION_PATTERN = /(?:^|[^\w])@[^\s@]+/
+const WHATSAPP_CONTACT_NAME_PLACEHOLDER_PATTERN = /\[nome\]/gi
 const WHATSAPP_DIRECTORY_SEARCH_LIMIT = 20
 
 interface WhatsappRichMessageInput {
@@ -675,13 +676,7 @@ export class WhatsappService implements OnModuleInit {
       return this.toLogView(row)
     }
 
-    const richMessage = this.normalizeRichMessagePayload({
-      message: automation.message,
-      imageBase64: automation.imageBase64,
-      imageMimeType: automation.imageMimeType,
-      imageFileName: automation.imageFileName,
-      mentionJids: automation.mentionJids
-    })
+    const richMessage = await this.resolveAutomationMessagePayload(automation)
     const metadata = this.buildDispatchMetadata(richMessage)
 
     const scheduledFor = automation.nextRunAt ?? new Date()
@@ -803,6 +798,46 @@ export class WhatsappService implements OnModuleInit {
     }
 
     await this.adapter.sendMessage(targetJid, this.toOutboundMessage(payload))
+  }
+
+  private async resolveAutomationMessagePayload(automation: WhatsappAutomation) {
+    return this.normalizeRichMessagePayload({
+      message: await this.resolveAutomationMessage(automation),
+      imageBase64: automation.imageBase64,
+      imageMimeType: automation.imageMimeType,
+      imageFileName: automation.imageFileName,
+      mentionJids: automation.mentionJids
+    })
+  }
+
+  private async resolveAutomationMessage(automation: WhatsappAutomation) {
+    if (
+      automation.targetType !== WhatsappAutomationTargetType.CONTACT ||
+      !automation.targetJid ||
+      !automation.message.toLowerCase().includes("[nome]")
+    ) {
+      return automation.message
+    }
+
+    const phoneNumber = this.extractPhoneNumberFromContactJid(automation.targetJid)
+
+    if (!phoneNumber) {
+      throw new BadRequestException("Não foi possível identificar o telefone do contato da automação.")
+    }
+
+    const contact = await this.prisma.contact.findUnique({
+      where: {
+        phoneNumber
+      }
+    })
+
+    if (!contact) {
+      throw new NotFoundException("Contato da automação não encontrado na agenda interna.")
+    }
+
+    const contactName = contact.name?.trim() || phoneNumber
+
+    return automation.message.replaceAll(WHATSAPP_CONTACT_NAME_PLACEHOLDER_PATTERN, contactName)
   }
 
   private normalizeRichMessagePayload(input: WhatsappRichMessageInput): WhatsappRichMessagePayload {
@@ -1288,6 +1323,17 @@ export class WhatsappService implements OnModuleInit {
 
   private buildGroupSearchText(name: string, jid: string) {
     return buildSearchText([name, jid])
+  }
+
+  private extractPhoneNumberFromContactJid(jid: string) {
+    const [identifier] = jid.split("@")
+    const digits = identifier?.replace(/\D/g, "") ?? ""
+
+    if (digits.length < 8 || digits.length > 15) {
+      return null
+    }
+
+    return digits
   }
 
   private normalizeOptionalString(value?: string | null) {

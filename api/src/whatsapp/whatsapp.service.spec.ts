@@ -355,6 +355,61 @@ describe("WhatsappService", () => {
     })
   })
 
+  it("substitui [nome] pelo nome salvo quando a automacao tem destino contato", async () => {
+    let sentPayload: unknown = null
+    let createdLogData: Partial<WhatsappDispatchLog> = {}
+    const automation = makeAutomation({
+      message: "Olá, [nome]! Seu lembrete chegou.",
+      targetType: WhatsappAutomationTargetType.CONTACT,
+      targetJid: "5511999999999@s.whatsapp.net"
+    })
+    const createdLog = makeLog({
+      status: WhatsappDispatchStatus.PENDING,
+      sentAt: null,
+      attempts: 1,
+      errorMessage: null,
+      targetType: WhatsappAutomationTargetType.CONTACT,
+      targetJid: "5511999999999@s.whatsapp.net"
+    })
+    const prisma = {
+      whatsappConnection: {
+        upsert: async () => makeConnection()
+      },
+      contact: {
+        findUnique: async ({ where }: { where: { phoneNumber: string } }) =>
+          where.phoneNumber === "5511999999999" ? makeContact() : null
+      },
+      whatsappDispatchLog: {
+        findUnique: async () => null,
+        create: async ({ data }: { data: Partial<WhatsappDispatchLog> }) => {
+          createdLogData = data
+          return makeLog({ ...createdLog, ...data })
+        },
+        update: async ({ data }: { data: Partial<WhatsappDispatchLog> }) => makeLog({ ...createdLog, ...data })
+      },
+      whatsappAutomation: {
+        update: async ({ data }: { data: Partial<WhatsappAutomation> }) => makeAutomation({ ...automation, ...data })
+      }
+    }
+    const adapter = {
+      isReady: () => true,
+      sendMessage: async (_jid: string, payload: unknown) => {
+        sentPayload = payload
+      }
+    }
+    const service = createService(prisma, adapter)
+    const dispatchAutomation = getDispatch(service)
+
+    await dispatchAutomation(automation, "scheduler")
+
+    assert.equal(createdLogData.message, "Olá, Maria Silva! Seu lembrete chegou.")
+    assert.deepEqual(sentPayload, {
+      text: "Olá, Maria Silva! Seu lembrete chegou.",
+      image: null,
+      mentions: []
+    })
+  })
+
   it("lista participantes do grupo informado para autocomplete", async () => {
     const adapter = {
       isReady: () => true,
