@@ -153,24 +153,12 @@ export class ContactsService {
     const digits = normalizedValue.replace(/\D/g, "")
     const nationalNumber = digits.startsWith("55") ? digits.slice(2) : digits
 
-    if (nationalNumber.length !== 10 && nationalNumber.length !== 11) {
-      throw new BadRequestException("Telefone inválido. Informe DDD + número com 8 ou 9 dígitos.")
+    if (nationalNumber.length !== 11) {
+      throw new BadRequestException("Telefone inválido. Informe DDD + número com 9 dígitos.")
     }
 
     const ddd = nationalNumber.slice(0, 2)
-    let localNumber = nationalNumber.slice(2)
-
-    if (localNumber.length === 9) {
-      if (!localNumber.startsWith("9")) {
-        throw new BadRequestException("Telefone inválido. Quando houver 9 dígitos, o primeiro deve ser 9.")
-      }
-
-      localNumber = localNumber.slice(1)
-    }
-
-    if (localNumber.length !== 8) {
-      throw new BadRequestException("Telefone inválido. O número final deve ter 8 dígitos após a normalização.")
-    }
+    const localNumber = nationalNumber.slice(2)
 
     return `55${ddd}${localNumber}`
   }
