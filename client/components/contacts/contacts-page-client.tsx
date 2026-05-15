@@ -375,13 +375,13 @@ export function ContactsPageClient() {
                 <input
                   className="ui-input"
                   onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))}
-                  placeholder="35987654321"
+                  placeholder="3587654321"
                   value={form.phoneNumber}
                 />
               </label>
 
               <p className="contacts-card__hint">
-                Digite DDD e 9 dígitos.
+                Digite DDD e 8 ou 9 dígitos.
               </p>
 
               <Button fullWidth isLoading={saving} loadingLabel="Salvando..." type="submit" variant="primary">

@@ -34,7 +34,7 @@ Dominio administrativo para listar e complementar a agenda interna de contatos u
 - `POST /contacts` aceita `name`, `company`, `email` e `phoneNumber` como opcionais.
 - `PATCH /contacts/:id` permite limpar ou alterar `name`, `company`, `email` e `phoneNumber` no proprio contato.
 - `email`, quando enviado, e normalizado para lowercase.
-- `phoneNumber`, quando enviado, e salvo no formato `55 + DDD + numero com 9 digitos`.
+- `phoneNumber`, quando enviado, e salvo no formato `55 + DDD + numero com 8 ou 9 digitos`.
 - `searchText` e recalculado automaticamente a partir de nome, empresa, e-mail e telefone normalizado.
 - Caracteres nao numericos como `(`, `)`, espaco, `-` e `+` sao descartados antes da validacao.
 - Se `email` ou `phoneNumber` ja existir, o cadastro vira complemento do contato existente em vez de duplicacao.
@@ -52,5 +52,5 @@ Dominio administrativo para listar e complementar a agenda interna de contatos u
 ## Possiveis erros
 - `401 Unauthorized` ou `403 Forbidden`
 - E-mail invalido
-- Telefone sem DDD ou com quantidade diferente de 9 digitos locais
+- Telefone sem DDD ou com quantidade de digitos fora da regra (aceito 8 ou 9 locais)
 - Tentativa de mesclar e-mail e telefone de contatos diferentes

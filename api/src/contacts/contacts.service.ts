@@ -153,8 +153,8 @@ export class ContactsService {
     const digits = normalizedValue.replace(/\D/g, "")
     const nationalNumber = digits.startsWith("55") ? digits.slice(2) : digits
 
-    if (nationalNumber.length !== 11) {
-      throw new BadRequestException("Telefone inválido. Informe DDD + número com 9 dígitos.")
+    if (nationalNumber.length !== 10 && nationalNumber.length !== 11) {
+      throw new BadRequestException("Telefone inválido. Informe DDD + número com 8 ou 9 dígitos.")
     }
 
     const ddd = nationalNumber.slice(0, 2)
