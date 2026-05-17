@@ -435,7 +435,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     this.validateAutomationSchedule(dto.kind, dto)
     const target = this.resolveTargetInput(dto.targetType, dto.targetJid, dto.targetJids)
     const richMessage = this.normalizeRichMessagePayload(dto)
-    const nextRunAt = this.resolveNextRunAt(dto.kind, dto)
+    const nextRunAt = this.resolveNextRunAt(dto.kind, dto, dto.recurrenceTimeZone?.trim() || DEFAULT_TIME_ZONE)
 
     const row = await this.prisma.whatsappAutomation.create({
       data: {
@@ -495,7 +495,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
             mentionJids: dto.mentionNumbers === undefined ? existing.mentionJids : undefined
           })
         : null
-    const nextRunAt = this.resolveNextRunAt(kind, runtimeInput)
+    const nextRunAt = this.resolveNextRunAt(kind, runtimeInput, dto.recurrenceTimeZone?.trim() || existing.recurrenceTimeZone)
 
     const row = await this.prisma.whatsappAutomation.update({
       where: { id },
@@ -547,7 +547,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       where: { id },
       data: {
         status: nextStatus,
-        nextRunAt: nextStatus === WhatsappAutomationStatus.ACTIVE ? this.resolveNextRunAt(existing.kind, existing) : null
+        nextRunAt: nextStatus === WhatsappAutomationStatus.ACTIVE ? this.resolveNextRunAt(existing.kind, existing, existing.recurrenceTimeZone) : null
       }
     })
 
@@ -1248,9 +1248,10 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
 
   private resolveNextRunAt(
     kind: WhatsappAutomationKind,
-    dto: WhatsappScheduleInput
+    dto: WhatsappScheduleInput,
+    timeZone = DEFAULT_TIME_ZONE
   ) {
-    return resolveWhatsappNextRunAt(kind, dto)
+    return resolveWhatsappNextRunAt(kind, dto, undefined, timeZone)
   }
 
   private validateAutomationSchedule(
@@ -1307,80 +1308,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       daysOfWeek: automation.daysOfWeek,
       dayOfMonth: automation.dayOfMonth,
       monthDay: automation.monthDay
-    })
-  }
-
-  private buildNextDailyRun(reference: Date, hours: number, minutes: number) {
-    const candidate = this.withTime(reference, hours, minutes)
-    if (candidate.getTime() <= reference.getTime()) {
-      candidate.setDate(candidate.getDate() + 1)
-    }
-
-    return candidate
-  }
-
-  private buildNextWeeklyRun(reference: Date, hours: number, minutes: number, daysOfWeek: number[]) {
-    if (daysOfWeek.length === 0) {
-      return this.buildNextDailyRun(reference, hours, minutes)
-    }
-
-    for (let offset = 0; offset < 14; offset += 1) {
-      const candidate = new Date(reference)
-      candidate.setDate(candidate.getDate() + offset)
-      candidate.setHours(hours, minutes, 0, 0)
-
-      if (daysOfWeek.includes(candidate.getDay()) && candidate.getTime() > reference.getTime()) {
-        return candidate
-      }
-    }
-
-    const fallback = this.withTime(reference, hours, minutes)
-    fallback.setDate(fallback.getDate() + 7)
-    return fallback
-  }
-
-  private buildNextMonthlyRun(reference: Date, hours: number, minutes: number, dayOfMonth: number) {
-    const candidate = new Date(reference)
-    candidate.setHours(hours, minutes, 0, 0)
-    candidate.setDate(Math.min(dayOfMonth, this.getLastDayOfMonth(candidate.getFullYear(), candidate.getMonth())))
-
-    if (candidate.getTime() <= reference.getTime()) {
-      candidate.setMonth(candidate.getMonth() + 1)
-      candidate.setDate(
-        Math.min(dayOfMonth, this.getLastDayOfMonth(candidate.getFullYear(), candidate.getMonth()))
-      )
-    }
-
-    return candidate
-  }
-
-  private buildNextYearlyRun(reference: Date, hours: number, minutes: number, monthDay: string) {
-    const [month, day] = monthDay.split("-").map((value) => Number(value))
-    const candidate = new Date(reference)
-    candidate.setMonth(Math.max(month - 1, 0))
-    candidate.setDate(day)
-    candidate.setHours(hours, minutes, 0, 0)
-
-    if (candidate.getTime() <= reference.getTime()) {
-      candidate.setFullYear(candidate.getFullYear() + 1)
-    }
-
-    return candidate
-  }
-
-  private withTime(reference: Date, hours: number, minutes: number) {
-    const candidate = new Date(reference)
-    candidate.setHours(hours, minutes, 0, 0)
-    return candidate
-  }
-
-  private parseTimeOfDay(timeOfDay: string) {
-    const [hours, minutes] = timeOfDay.split(":").map((value) => Number(value))
-    return [Number.isFinite(hours) ? hours : 9, Number.isFinite(minutes) ? minutes : 0]
-  }
-
-  private getLastDayOfMonth(year: number, monthIndex: number) {
-    return new Date(year, monthIndex + 1, 0).getDate()
+    }, automation.recurrenceTimeZone)
   }
 
   private toConnectionView(connection: WhatsappConnection): WhatsappConnectionView {
