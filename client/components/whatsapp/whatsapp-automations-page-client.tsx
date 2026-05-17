@@ -651,7 +651,8 @@ export function WhatsappAutomationsPageClient() {
     }
   }
 
-  const canDispatch = connection?.status === "READY"
+  const connectionReady = connection?.status === "READY"
+  const canDispatch = connectionReady
   const visibleAutomations = automations.filter(shouldShowAutomation)
   const mentionSuggestions = mentionOptions.slice(0, MAX_MENTION_SUGGESTIONS)
   const selectedGroup = targetType === "GROUP" ? selectedTargets[0] ?? null : null
@@ -676,6 +677,12 @@ export function WhatsappAutomationsPageClient() {
               <h3 className="whatsapp-card__title">Cadastrar regra</h3>
             </div>
           </div>
+
+          {!loading && !connectionReady && (
+            <div className="whatsapp-alert whatsapp-alert--error">
+              A conexão WhatsApp não está ativa. <a href="/whatsapp/connection">Configure a conexão</a> antes de criar automações.
+            </div>
+          )}
 
           <form className="whatsapp-form" onSubmit={handleCreate}>
             <label>
@@ -912,7 +919,11 @@ export function WhatsappAutomationsPageClient() {
               </label>
             )}
 
-            <button className="whatsapp-button" disabled={saving}>
+            <button
+              className="whatsapp-button"
+              disabled={!connectionReady || saving}
+              title={!connectionReady ? "Configure a conexão WhatsApp antes de criar automações" : undefined}
+            >
               {saving ? "Salvando..." : "Criar automação"}
             </button>
           </form>

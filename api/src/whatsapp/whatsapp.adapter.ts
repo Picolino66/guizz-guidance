@@ -25,9 +25,10 @@ interface ConnectionEvents {
   onSession: (session: unknown | null) => Promise<void> | void
 }
 
-const MAX_RECONNECT_ATTEMPTS = 5
+const MAX_RECONNECT_ATTEMPTS = 8
 const MAX_QR_RETRIES = 5
-const RECONNECT_DELAY_MS = 2000
+const RECONNECT_BASE_DELAY_MS = 3000
+const RECONNECT_MAX_DELAY_MS = 60000
 const WHATSAPP_CONTACT_JID_PATTERN = /^(?:\d+@s\.whatsapp\.net|[\w.-]+@lid)$/
 
 const KEY_MAP: { [T in keyof SignalDataTypeMap]: string } = {
@@ -478,11 +479,13 @@ export class WhatsappAdapter {
 
     this.reconnectAttempts += 1
     await this.requireEvents().onReconnecting(reason || "Reconectando sessão WhatsApp.", this.reconnectAttempts)
-    this.scheduleReconnect()
+    this.scheduleReconnect(this.reconnectAttempts)
   }
 
-  private scheduleReconnect() {
+  private scheduleReconnect(attempt: number) {
     this.clearReconnectTimer()
+    const delay = Math.min(RECONNECT_BASE_DELAY_MS * Math.pow(2, attempt - 1), RECONNECT_MAX_DELAY_MS)
+    console.log(`[WhatsApp] Tentativa ${attempt}/${MAX_RECONNECT_ATTEMPTS} — aguardando ${delay}ms`)
     this.reconnectTimer = setTimeout(() => {
       this.client = null
       this.loading = null
@@ -491,7 +494,7 @@ export class WhatsappAdapter {
       if (this.events) {
         void this.connect(this.session, this.events)
       }
-    }, RECONNECT_DELAY_MS)
+    }, delay)
   }
 
   private async destroyCurrentClient(logout: boolean) {
